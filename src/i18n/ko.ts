@@ -17,7 +17,7 @@ export const ko = {
       '왜 매칭됐는지 이유를 함께 봐요',
     ],
     disclaimer:
-      '이 서비스는 대한민국 청년 지원금 32개 프로그램(2026년 7월 기준)을 대상으로 하며, 실제 자격은 각 프로그램 공식 페이지에서 최종 확인이 필요합니다.',
+      '이 서비스는 대한민국 청년 지원금 프로그램을 대상으로 하며, 실제 자격은 각 프로그램 공식 페이지에서 최종 확인이 필요합니다.',
   },
   wizard: {
     back: '뒤로',
@@ -33,7 +33,6 @@ export const ko = {
     step1: {
       title: '어디 살아요?',
       hint: '시/도는 꼭 골라주세요. 시/군/구는 선택이에요.',
-      searchSido: '시/도 검색',
       searchSigungu: '시/군/구 검색',
       errorSido: '관심지역을 선택해주세요.',
       ariaSidoSelected: (sido: string) => `${sido} 선택됨. 시/군/구 목록이 나타났어요.`,
@@ -62,6 +61,12 @@ export const ko = {
   },
   results: {
     back: '← 다시 입력',
+    demoBanner: '지금은 예시 데이터 3건으로 동작 중이에요. 실제 지원금 데이터가 연결되면 이 안내는 사라져요.',
+    noProfile: {
+      title: '프로필이 없습니다.',
+      body: '입력하신 정보를 찾을 수 없어요. 다시 입력해주세요.',
+      cta: '프로필 입력하기',
+    },
     countTitle: (n: number) => `총 ${n}건이 매칭되었어요`,
     countClosedSub: (m: number) => `마감된 ${m}건 포함`,
     filterAll: '전체',

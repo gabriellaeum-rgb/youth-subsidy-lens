@@ -1,8 +1,41 @@
-import { describe, test, expect } from 'vitest';
-import { serializeProfile, deserializeProfile } from '../src/lib/profile';
+import { describe, test, expect, beforeEach, afterEach } from 'vitest';
+import {
+  saveProfileToSession,
+  loadProfileFromSession,
+  clearProfileFromSession,
+} from '../src/lib/profile';
 import type { Profile } from '../src/types';
 
-describe('serializeProfile / deserializeProfile round-trip', () => {
+/**
+ * F0-AC0.2: profile state lives only in sessionStorage, never in the URL. This test
+ * environment is Node (no DOM) — stub a minimal in-memory sessionStorage on `window`
+ * rather than pulling in jsdom for a single test file.
+ */
+function createMemoryStorage(): Storage {
+  const store = new Map<string, string>();
+  return {
+    getItem: (key: string) => store.get(key) ?? null,
+    setItem: (key: string, value: string) => void store.set(key, value),
+    removeItem: (key: string) => void store.delete(key),
+    clear: () => store.clear(),
+    key: (index: number) => Array.from(store.keys())[index] ?? null,
+    get length() {
+      return store.size;
+    },
+  } as Storage;
+}
+
+beforeEach(() => {
+  (globalThis as unknown as { window: unknown }).window = {
+    sessionStorage: createMemoryStorage(),
+  };
+});
+
+afterEach(() => {
+  delete (globalThis as unknown as { window?: unknown }).window;
+});
+
+describe('saveProfileToSession / loadProfileFromSession round-trip', () => {
   test('full profile round-trips', () => {
     const profile: Profile = {
       region: { sido: '서울특별시', sigungu: '마포구' },
@@ -14,36 +47,35 @@ describe('serializeProfile / deserializeProfile round-trip', () => {
       specialization: ['여성', '지역인재'],
       incomeManwon: 250,
     };
-    const sp = serializeProfile(profile);
-    const back = deserializeProfile(sp);
-    expect(back).not.toBeNull();
-    expect(back?.region.sido).toBe('서울특별시');
-    expect(back?.region.sigungu).toBe('마포구');
-    expect(back?.age).toBe(28);
-    expect(back?.education).toBe('대학졸업');
-    expect(back?.specialization).toEqual(['여성', '지역인재']);
-    expect(back?.incomeManwon).toBe(250);
+    saveProfileToSession(profile);
+    const back = loadProfileFromSession();
+    expect(back).toEqual(profile);
   });
 
-  test('missing sido returns null', () => {
-    const sp = new URLSearchParams({ age: '25' });
-    expect(deserializeProfile(sp)).toBeNull();
+  test('no saved profile returns null', () => {
+    expect(loadProfileFromSession()).toBeNull();
   });
 
-  test('missing age returns null', () => {
-    const sp = new URLSearchParams({ sido: '서울' });
-    expect(deserializeProfile(sp)).toBeNull();
+  test('clearProfileFromSession removes the saved profile', () => {
+    saveProfileToSession({
+      region: { sido: '서울특별시' },
+      age: 25,
+      education: '제한없음',
+      major: '제한없음',
+      marital: '제한없음',
+      employment: '제한없음',
+      specialization: ['제한없음'],
+      incomeManwon: undefined,
+    });
+    clearProfileFromSession();
+    expect(loadProfileFromSession()).toBeNull();
   });
 
-  test('missing income becomes undefined (잘 몰라요)', () => {
-    const sp = new URLSearchParams({ sido: '서울', age: '25' });
-    const back = deserializeProfile(sp);
-    expect(back?.incomeManwon).toBeUndefined();
-  });
-
-  test('empty spec defaults to 제한없음', () => {
-    const sp = new URLSearchParams({ sido: '서울', age: '25', spec: '' });
-    const back = deserializeProfile(sp);
-    expect(back?.specialization).toEqual(['제한없음']);
+  test('malformed stored value (missing sido/age) returns null', () => {
+    (globalThis as unknown as { window: { sessionStorage: Storage } }).window.sessionStorage.setItem(
+      'yfl:profile',
+      JSON.stringify({ foo: 'bar' }),
+    );
+    expect(loadProfileFromSession()).toBeNull();
   });
 });

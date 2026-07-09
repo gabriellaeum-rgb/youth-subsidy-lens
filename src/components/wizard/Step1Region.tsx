@@ -14,13 +14,9 @@ type Props = {
 };
 
 export function Step1Region({ sido, sigungu, onChange, error }: Props) {
-  const [sidoQuery, setSidoQuery] = React.useState('');
   const [sigunguQuery, setSigunguQuery] = React.useState('');
   const t = ko.wizard.step1;
 
-  const filteredSido = SIDO_LIST.filter(
-    (s) => s.includes(sidoQuery) || SIDO_SHORT[s].includes(sidoQuery),
-  );
   const sigunguOptions = sido ? SIGUNGU_BY_SIDO[sido as Sido] ?? [] : [];
   const filteredSigungu = sigunguOptions.filter((s) => s.includes(sigunguQuery));
 
@@ -50,7 +46,7 @@ export function Step1Region({ sido, sigungu, onChange, error }: Props) {
               value={sigunguQuery}
               onChange={(e) => setSigunguQuery(e.target.value)}
               placeholder={t.searchSigungu}
-              className="w-full min-h-[44px] rounded-md border border-ink-300 px-4 text-body focus:outline-none focus:border-primary focus:shadow-focus"
+              className="w-full min-h-[48px] rounded-md border border-ink-300 px-4 text-body focus:outline-none focus:border-primary focus:shadow-focus"
             />
             <div role="radiogroup" aria-label="시/군/구 (선택)" className="flex flex-wrap gap-2 max-h-64 overflow-y-auto">
               {filteredSigungu.map((sg) => (
@@ -67,15 +63,8 @@ export function Step1Region({ sido, sigungu, onChange, error }: Props) {
 
   return (
     <div className="flex flex-col gap-2">
-      <input
-        type="text"
-        value={sidoQuery}
-        onChange={(e) => setSidoQuery(e.target.value)}
-        placeholder={t.searchSido}
-        className="w-full min-h-[44px] rounded-md border border-ink-300 px-4 text-body focus:outline-none focus:border-primary focus:shadow-focus"
-      />
       <div role="radiogroup" aria-label={t.title} className="flex flex-wrap gap-2">
-        {filteredSido.map((s) => (
+        {SIDO_LIST.map((s) => (
           <Chip key={s} role="radio" selected={false} onClick={() => onChange(s, undefined)}>
             {SIDO_SHORT[s]}
           </Chip>

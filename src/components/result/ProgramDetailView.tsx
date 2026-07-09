@@ -1,10 +1,10 @@
 'use client';
 
 import * as React from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useRouter } from 'next/navigation';
 import { X } from 'lucide-react';
 import { ko } from '@/i18n/ko';
-import { deserializeProfile } from '@/lib/profile';
+import { loadProfileFromSession } from '@/lib/profile';
 import { matches } from '@/lib/matching';
 import { usePrograms } from '@/lib/usePrograms';
 import { Badge } from '@/components/ui/Badge';
@@ -14,9 +14,11 @@ import { ResultCardSkeleton } from '@/components/ui/Skeleton';
 
 export function ProgramDetailView({ programId }: { programId: string }) {
   const router = useRouter();
-  const searchParams = useSearchParams();
   const programsState = usePrograms();
-  const profile = React.useMemo(() => deserializeProfile(searchParams), [searchParams]);
+  const [profile, setProfile] = React.useState<ReturnType<typeof loadProfileFromSession>>(null);
+  React.useEffect(() => {
+    setProfile(loadProfileFromSession());
+  }, []);
 
   React.useEffect(() => {
     function onKeyDown(e: KeyboardEvent) {
@@ -72,7 +74,7 @@ export function ProgramDetailView({ programId }: { programId: string }) {
           type="button"
           aria-label={ko.results.detail.close}
           onClick={() => router.back()}
-          className="inline-flex items-center justify-center h-11 w-11 rounded-full hover:bg-bg-inset focus-visible:outline-none focus-visible:shadow-focus"
+          className="inline-flex items-center justify-center h-12 w-12 rounded-full hover:bg-bg-inset focus-visible:outline-none focus-visible:shadow-focus"
         >
           <X size={20} aria-hidden />
         </button>
@@ -120,7 +122,10 @@ export function ProgramDetailView({ programId }: { programId: string }) {
         </div>
       </div>
 
-      <div className="sticky bottom-0 bg-bg px-5 py-4 border-t border-ink-100">
+      <div
+        className="sticky bottom-0 bg-bg px-5 pt-4 border-t border-ink-100"
+        style={{ paddingBottom: 'max(16px, env(safe-area-inset-bottom))' }}
+      >
         <Button
           variant={isClosed ? 'secondary' : 'primary'}
           size="lg"

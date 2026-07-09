@@ -67,3 +67,23 @@ body {
     box-shadow: var(--shadow-raised);
   }
 }
+
+/* Landing hero brand backdrop (design_spec_v3 §D) — CSS-only gradient blur, desktop
+   only. Never painted on <768px so the smallest, most bandwidth-constrained viewport
+   stays plainest and the CTA-above-fold rule (v2 AC5.3) can never be pushed down. */
+.landing-hero {
+  position: relative;
+  overflow: hidden;
+}
+@media (min-width: 768px) {
+  .landing-hero::before {
+    content: '';
+    position: absolute;
+    inset: -20% -10% auto -10%;
+    height: 480px;
+    background: var(--gradient-brand-soft);
+    filter: blur(48px);
+    pointer-events: none;
+    z-index: 0;
+  }
+}

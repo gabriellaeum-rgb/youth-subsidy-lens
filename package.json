@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "prebuild": "node scripts/validate-programs.mjs",
+    "prebuild": "node scripts/validate-programs.mjs && node scripts/check-no-placeholder.mjs",
     "dev": "next dev",
     "build": "next build",
     "start": "next start",

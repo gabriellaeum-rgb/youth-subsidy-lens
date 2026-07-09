@@ -24,7 +24,7 @@ export function Step7Specialization({ legendId, value, onChange }: Props) {
     <div className="flex flex-col gap-3">
       <div role="group" aria-labelledby={legendId} className="flex flex-wrap gap-2">
         {SPECIALIZATION_OPTIONS.map((opt) => (
-          <Chip key={opt} role="checkbox" showCheck selected={selected.includes(opt)} onClick={() => toggle(opt)}>
+          <Chip key={opt} role="checkbox" selected={selected.includes(opt)} onClick={() => toggle(opt)}>
             {opt}
           </Chip>
         ))}

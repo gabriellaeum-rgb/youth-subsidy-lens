@@ -19,7 +19,6 @@ import {
   loadWizardDraft,
   saveProfileToSession,
   saveWizardDraft,
-  serializeProfile,
   type WizardData,
 } from '@/lib/profile';
 import { Button } from '@/components/ui/Button';
@@ -89,12 +88,25 @@ export function WizardShell() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [hydrated, step, stepParam, data.sido, data.age]);
 
+  // Guards against a stale-closure double-navigation: two clicks fired before React
+  // commits the first one's new `step` would otherwise both read the same old `step`
+  // closure and both push the same target — net effect, one step gets silently skipped
+  // and the wizard lands one step short of where the click count says it should. Once
+  // set, further goTo() calls are ignored until a render actually observes the new step.
+  const navigatingRef = React.useRef(false);
+  React.useEffect(() => {
+    navigatingRef.current = false;
+  }, [step]);
+
   function goTo(n: number) {
+    if (navigatingRef.current) return;
+    navigatingRef.current = true;
     router.push(`/onboarding?step=${n}`);
   }
 
   function handleNext() {
-    if (step === 1) {
+    const cur = step;
+    if (cur === 1) {
       if (!data.sido) {
         setSidoError(ko.wizard.step1.errorSido);
         return;
@@ -103,7 +115,7 @@ export function WizardShell() {
       goTo(2);
       return;
     }
-    if (step === 2) {
+    if (cur === 2) {
       if (data.age === undefined) {
         setAgeError(ko.wizard.step2.errorBlank);
         return;
@@ -116,8 +128,8 @@ export function WizardShell() {
       goTo(3);
       return;
     }
-    if (step < 8) {
-      goTo(step + 1);
+    if (cur < 8) {
+      goTo(cur + 1);
       return;
     }
     // step 8 — finish
@@ -133,8 +145,7 @@ export function WizardShell() {
     };
     saveProfileToSession(profile);
     clearWizardDraft();
-    const sp = serializeProfile(profile);
-    router.push(`/results?${sp.toString()}`);
+    router.push('/results');
   }
 
   function handleBack() {
@@ -156,7 +167,7 @@ export function WizardShell() {
   return (
     <div className="flex flex-col min-h-screen">
       <div className="sticky top-0 z-20 bg-bg border-b border-ink-100">
-        <div className="max-w-content mx-auto px-5 md:px-6 h-14 flex items-center justify-between">
+        <div className="max-w-content mx-auto px-5 md:px-6 h-14 flex items-center">
           {step > 1 ? (
             <button
               type="button"
@@ -169,16 +180,22 @@ export function WizardShell() {
           ) : (
             <span />
           )}
-          <Button variant="link" onClick={() => setResetOpen(true)}>
-            {ko.wizard.reset}
-          </Button>
         </div>
-        <div className="max-w-content mx-auto px-5 md:px-6 pb-3">
-          <ProgressBar step={step} />
+        <div className="max-w-content mx-auto px-5 md:px-6 pb-3 flex items-center gap-3">
+          <div className="flex-1">
+            <ProgressBar step={step} />
+          </div>
+          <button
+            type="button"
+            onClick={() => setResetOpen(true)}
+            className="shrink-0 text-caption text-ink-500 hover:text-ink-700 focus-visible:outline-none focus-visible:shadow-focus rounded-sm"
+          >
+            {ko.wizard.reset}
+          </button>
         </div>
       </div>
 
-      <div className="flex-1 max-w-column mx-auto w-full px-5 md:px-0 py-6 flex flex-col gap-4">
+      <div className="max-w-column mx-auto w-full px-5 md:px-0 py-6 flex flex-col gap-4">
         <div>
           <h1 id={TITLE_ID} className="text-h1 font-bold text-ink-900">
             {stepMeta.title}

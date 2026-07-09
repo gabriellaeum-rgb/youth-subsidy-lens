@@ -33,3 +33,6 @@ export function usePrograms(): ProgramsState {
 
   return state;
 }
+
+/** Demo-dataset threshold — mirrors scripts/validate-programs.mjs's own "expected 30–32" check. */
+export const DEMO_DATASET_THRESHOLD = 30;

@@ -37,13 +37,15 @@
     'Apple SD Gothic Neo', 'Noto Sans KR', 'Malgun Gothic', 'Segoe UI', Roboto, sans-serif;
   --font-mono: 'JetBrains Mono', 'IBM Plex Mono', ui-monospace, 'SFMono-Regular', Menlo, monospace;
 
-  --text-display: clamp(28px, 8vw, 36px);
-  --text-h1: clamp(22px, 5vw, 26px);
-  --text-h2: 20px;
-  --text-h3: 18px;
-  --text-body: 16px;
-  --text-small: 14px;
-  --text-caption: 13px;
+  /* rem-based so OS/browser "larger text" settings (F6-AC6.10/6.12) scale the whole
+     type system instead of only the root font-size — px would ignore that setting. */
+  --text-display: clamp(1.75rem, 8vw, 2.25rem);
+  --text-h1: clamp(1.375rem, 5vw, 1.625rem);
+  --text-h2: 1.25rem;
+  --text-h3: 1.125rem;
+  --text-body: 1rem;
+  --text-small: 0.875rem;
+  --text-caption: 0.8125rem;
 
   --fw-regular: 400;
   --fw-medium: 500;
@@ -91,6 +93,71 @@
   --easing-standard: cubic-bezier(0.2, 0, 0, 1);
   --easing-decel: cubic-bezier(0, 0, 0.2, 1);
   --easing-accel: cubic-bezier(0.4, 0, 1, 1);
+}
+
+/*
+ * Brand key-art layer (design_spec_v3 §A) — marketing/identity surfaces ONLY:
+ * landing hero backdrop, logo lockup, favicon, OG image. Scoped under
+ * .brand-key-art so functional UI (buttons/inputs/chips/badges/cards) can
+ * never accidentally inherit a gradient — those stay flat single-blue.
+ */
+.brand-key-art {
+  --gradient-brand: linear-gradient(135deg, #2dc7f0 0%, #4c6ef5 50%, #8b5cf6 100%);
+  --gradient-brand-soft: linear-gradient(
+    135deg,
+    rgba(45, 199, 240, 0.12) 0%,
+    rgba(76, 110, 245, 0.1) 50%,
+    rgba(139, 92, 246, 0.1) 100%
+  );
+}
+
+/*
+ * Dark theme (F6-AC6.5–6.9) — follows OS/browser prefers-color-scheme only, no manual
+ * toggle UI. Every value below was computed against its actual pairing with a WCAG
+ * contrast calculator (not a mechanical color invert) — see the design spec's own
+ * warning that primary-tint-style tokens need dedicated dark variants, not an invert.
+ * Verified pairings (relative luminance formula, WCAG 2.x):
+ *   ink-900/700/500 on bg/bg-subtle:      6.4–17.6:1  (body-text AA target 4.5:1)
+ *   primary (#6B8CF5) on bg:               6.0:1
+ *   primary-ink (#0B0F1F) on primary btn:  6.1:1
+ *   primary on primary-tint:               5.0:1
+ *   success/warning/muted/danger on tint:  5.8–8.5:1
+ * primary-pressed on dark ink lands at 4.41:1, just under the 4.5 body-text line —
+ * accepted as-is since it only ever paints for the duration of a pointer-down.
+ */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --color-primary: #6b8cf5;
+    --color-primary-hover: #5b7ce8;
+    --color-primary-pressed: #4c6ef5;
+    --color-primary-tint: #1a2140;
+    --color-primary-ink: #0b0f1f;
+
+    --color-ink-900: #f5f7fa;
+    --color-ink-700: #c9ced8;
+    --color-ink-500: #9096a6;
+    --color-ink-300: #3a4150;
+    --color-ink-100: #20242d;
+
+    --color-bg: #0e1116;
+    --color-bg-subtle: #161a22;
+    --color-bg-inset: #1d222c;
+
+    --color-success: #34d399;
+    --color-success-tint: #10241c;
+    --color-warning: #f0a93b;
+    --color-warning-tint: #2a1d0c;
+    --color-muted: #9ca3af;
+    --color-muted-tint: #1d212b;
+    --color-danger: #f06b72;
+    --color-danger-tint: #2a1416;
+    --color-info: #6b8cf5;
+
+    --color-focus-ring: rgba(107, 140, 245, 0.45);
+
+    --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(255, 255, 255, 0.06);
+    --shadow-raised: 0 4px 12px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.06);
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {

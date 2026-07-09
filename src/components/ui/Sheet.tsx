@@ -82,14 +82,19 @@ export function Sheet({ open, onClose, titleId, descriptionId, children, footer 
             type="button"
             aria-label="닫기"
             onClick={onClose}
-            className="inline-flex items-center justify-center h-11 w-11 rounded-full hover:bg-bg-inset focus-visible:outline-none focus-visible:shadow-focus"
+            className="inline-flex items-center justify-center h-12 w-12 rounded-full hover:bg-bg-inset focus-visible:outline-none focus-visible:shadow-focus"
           >
             <X size={20} aria-hidden />
           </button>
         </div>
         <div className="overflow-y-auto px-5 pb-5">{children}</div>
         {footer && (
-          <div className="sticky bottom-0 bg-bg px-5 py-4 border-t border-ink-100">{footer}</div>
+          <div
+            className="sticky bottom-0 bg-bg px-5 pt-4 border-t border-ink-100"
+            style={{ paddingBottom: 'max(16px, env(safe-area-inset-bottom))' }}
+          >
+            {footer}
+          </div>
         )}
       </div>
     </div>

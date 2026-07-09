@@ -15,13 +15,13 @@ export default function OgImage() {
           flexDirection: 'column',
           alignItems: 'center',
           justifyContent: 'center',
-          background: '#2554F0',
+          background: 'linear-gradient(135deg, #2DC7F0 0%, #4C6EF5 50%, #8B5CF6 100%)',
           color: '#FFFFFF',
         }}
       >
-        <div style={{ fontSize: 72, fontWeight: 700, display: 'flex' }}>YouthFundLens</div>
+        <div style={{ fontSize: 72, fontWeight: 700, display: 'flex' }}>청년지원금렌즈</div>
         <div style={{ fontSize: 32, marginTop: 24, opacity: 0.9, display: 'flex' }}>
-          Government subsidies you qualify for, with reasons.
+          내게 맞는 정부 지원금, 이유까지 함께
         </div>
       </div>
     ),

@@ -1,0 +1,133 @@
+-- =============================================================================
+-- YouthFundLens (청년지원금렌즈) — Supabase schema
+--
+-- 실행 방법: Supabase 대시보드 > SQL Editor 에 이 파일 전체를 붙여넣고 Run 하세요.
+-- 이 파일은 여러 번 실행해도 안전하도록 작성되었습니다 (idempotent).
+-- =============================================================================
+
+-- -----------------------------------------------------------------------------
+-- 1. programs 테이블
+--    src/types/index.ts 의 Program 타입과 1:1로 매핑됩니다.
+-- -----------------------------------------------------------------------------
+create table if not exists public.programs (
+  id                text primary key,
+  "사업명"           text not null,
+  "관할"             text not null,
+  "분류"             text not null,
+  "주요_지원내용"     text not null,
+  "나이_하한"         integer not null,
+  "나이_상한"         integer not null,
+  "거주_지역"         text not null,
+  "최종학력_요건"     text not null,
+  "전공_요건"         text not null,
+  "혼인_요건"         text not null,
+  -- 단일 값(string) 또는 다중 값(string[])을 모두 저장할 수 있도록 jsonb 사용
+  "취업상태_요건"     jsonb not null default '"제한없음"'::jsonb,
+  "특화분야_요건"     jsonb not null default '[]'::jsonb,
+  "개인_소득_상한"     integer,
+  "모집상태"          text not null default '모집중',
+  "마감일"            date,
+  "공식_정보_링크"     text not null,
+  "특이사항_텍스트"    text,
+  "기타_요건_텍스트"   text,
+  "비고_텍스트"        text,
+  created_at         timestamptz not null default now(),
+  updated_at         timestamptz not null default now(),
+
+  constraint programs_id_format check (id ~ '^[a-z0-9-]+$'),
+  constraint programs_age_range check ("나이_하한" <= "나이_상한"),
+  constraint programs_status_enum check ("모집상태" in ('모집중', '마감')),
+  constraint programs_link_https check ("공식_정보_링크" like 'https://%')
+);
+
+comment on table public.programs is '청년 지원 사업(정책) 데이터 — 프론트엔드 매칭 위저드의 원천 데이터';
+
+-- -----------------------------------------------------------------------------
+-- 2. updated_at 자동 갱신 트리거
+-- -----------------------------------------------------------------------------
+create or replace function public.set_updated_at()
+returns trigger
+language plpgsql
+as $$
+begin
+  new.updated_at = now();
+  return new;
+end;
+$$;
+
+drop trigger if exists trg_programs_updated_at on public.programs;
+create trigger trg_programs_updated_at
+  before update on public.programs
+  for each row
+  execute function public.set_updated_at();
+
+-- -----------------------------------------------------------------------------
+-- 3. Row Level Security
+--    앱은 publishable(anon) key만 사용하므로, 읽기 전용으로 공개합니다.
+--    쓰기(INSERT/UPDATE/DELETE)는 대시보드(서비스 역할)에서만 수행하세요.
+-- -----------------------------------------------------------------------------
+alter table public.programs enable row level security;
+
+drop policy if exists "public read access" on public.programs;
+create policy "public read access"
+  on public.programs
+  for select
+  to anon, authenticated
+  using (true);
+
+-- -----------------------------------------------------------------------------
+-- 4. 조회 성능용 인덱스
+-- -----------------------------------------------------------------------------
+create index if not exists idx_programs_status on public.programs ("모집상태");
+create index if not exists idx_programs_region on public.programs ("거주_지역");
+
+-- -----------------------------------------------------------------------------
+-- 5. 시드 데이터 (기존 public/data/programs.json 과 동일한 샘플 3건)
+-- -----------------------------------------------------------------------------
+insert into public.programs (
+  id, "사업명", "관할", "분류", "주요_지원내용", "나이_하한", "나이_상한", "거주_지역",
+  "최종학력_요건", "전공_요건", "혼인_요건", "취업상태_요건", "특화분야_요건",
+  "개인_소득_상한", "모집상태", "마감일", "공식_정보_링크",
+  "특이사항_텍스트", "기타_요건_텍스트", "비고_텍스트"
+) values
+  (
+    'sample-nationwide-employment', '[샘플] 국민내일배움카드', '고용노동부', '일자리',
+    '직업훈련 최대 500만원', 15, 64, '전국',
+    '제한없음', '제한없음', '제한없음', '"제한없음"'::jsonb, '[]'::jsonb,
+    null, '모집중', null, 'https://www.hrd.go.kr/',
+    '재직자·자영업자는 자기부담금 발생', null, '샘플 데이터입니다. 실제 자격은 공식 페이지에서 확인해주세요.'
+  ),
+  (
+    'sample-seoul-monthly-rent', '[샘플] 서울 청년월세 지원', '서울시', '주거',
+    '월 최대 20만원, 최대 10개월', 19, 39, '서울',
+    '제한없음', '제한없음', '제한없음', '"제한없음"'::jsonb, '[]'::jsonb,
+    400, '모집중', null, 'https://youth.seoul.go.kr/',
+    '중위소득 150% 이하', '무주택 + 부모와 별도 거주 필수', '샘플 데이터입니다.'
+  ),
+  (
+    'sample-women-entrepreneur', '[샘플] 여성 예비창업 지원', '여성가족부', '창업',
+    '창업 초기 자금 최대 1,000만원 + 멘토링', 19, 39, '전국',
+    '제한없음', '제한없음', '제한없음', '["예비창업자", "미취업자"]'::jsonb, '["여성"]'::jsonb,
+    null, '모집중', '2026-12-31', 'https://www.mogef.go.kr/',
+    '여성 창업자 우선지원', '사업자등록 예정', '샘플 데이터입니다. M8 opt-in 검증용 protected-class row.'
+  )
+on conflict (id) do update set
+  "사업명" = excluded."사업명",
+  "관할" = excluded."관할",
+  "분류" = excluded."분류",
+  "주요_지원내용" = excluded."주요_지원내용",
+  "나이_하한" = excluded."나이_하한",
+  "나이_상한" = excluded."나이_상한",
+  "거주_지역" = excluded."거주_지역",
+  "최종학력_요건" = excluded."최종학력_요건",
+  "전공_요건" = excluded."전공_요건",
+  "혼인_요건" = excluded."혼인_요건",
+  "취업상태_요건" = excluded."취업상태_요건",
+  "특화분야_요건" = excluded."특화분야_요건",
+  "개인_소득_상한" = excluded."개인_소득_상한",
+  "모집상태" = excluded."모집상태",
+  "마감일" = excluded."마감일",
+  "공식_정보_링크" = excluded."공식_정보_링크",
+  "특이사항_텍스트" = excluded."특이사항_텍스트",
+  "기타_요건_텍스트" = excluded."기타_요건_텍스트",
+  "비고_텍스트" = excluded."비고_텍스트";

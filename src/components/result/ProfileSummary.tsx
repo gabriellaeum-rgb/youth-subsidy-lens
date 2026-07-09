@@ -1,3 +1,4 @@
+import { MapPin, User, GraduationCap, BookOpen, Heart, Briefcase, Tag, Wallet } from 'lucide-react';
 import type { Profile } from '@/types';
 import { SIDO_SHORT, type Sido } from '@/lib/regions';
 
@@ -7,14 +8,14 @@ export function ProfileSummary({ profile }: { profile: Profile }) {
   const income = profile.incomeManwon !== undefined ? `월 ${profile.incomeManwon}만원` : '제한없음';
 
   const chips = [
-    { icon: '📍', value: region },
-    { icon: '👤', value: `만 ${profile.age}세` },
-    { icon: '🎓', value: profile.education },
-    { icon: '📖', value: profile.major },
-    { icon: '💍', value: profile.marital },
-    { icon: '💼', value: profile.employment },
-    { icon: '🏷', value: profile.specialization.join(', ') },
-    { icon: '💰', value: income },
+    { icon: MapPin, value: region },
+    { icon: User, value: `만 ${profile.age}세` },
+    { icon: GraduationCap, value: profile.education },
+    { icon: BookOpen, value: profile.major },
+    { icon: Heart, value: profile.marital },
+    { icon: Briefcase, value: profile.employment },
+    { icon: Tag, value: profile.specialization.join(', ') },
+    { icon: Wallet, value: income },
   ];
 
   return (
@@ -24,7 +25,7 @@ export function ProfileSummary({ profile }: { profile: Profile }) {
           key={i}
           className="inline-flex items-center gap-2 rounded-pill bg-bg-inset text-ink-700 px-3 py-1 text-caption whitespace-nowrap shrink-0"
         >
-          <span aria-hidden>{c.icon}</span>
+          <c.icon size={14} aria-hidden />
           {c.value}
         </span>
       ))}

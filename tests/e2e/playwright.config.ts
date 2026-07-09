@@ -2,12 +2,15 @@ import { defineConfig, devices } from '@playwright/test';
 
 export default defineConfig({
   testDir: '.',
-  fullyParallel: true,
+  // Capped, not fully parallel — a single `next dev` instance compiles routes
+  // on-demand; too many concurrent workers hitting first-time routes at once
+  // starves the compiler and produces page.goto timeouts unrelated to app logic.
+  workers: 2,
   webServer: {
     command: 'npm run dev',
     url: 'http://localhost:3000',
     reuseExistingServer: true,
-    timeout: 60_000,
+    timeout: 120_000,
   },
   use: {
     baseURL: 'http://localhost:3000',

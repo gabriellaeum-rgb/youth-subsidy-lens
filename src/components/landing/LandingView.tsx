@@ -2,8 +2,9 @@
 
 import * as React from 'react';
 import { useRouter } from 'next/navigation';
+import { Search } from 'lucide-react';
 import { ko } from '@/i18n/ko';
-import { loadProfileFromSession, serializeProfile } from '@/lib/profile';
+import { loadProfileFromSession } from '@/lib/profile';
 import { Header } from '@/components/layout/Header';
 import { Footer } from '@/components/layout/Footer';
 import { TrustStrip } from '@/components/layout/TrustStrip';
@@ -12,34 +13,35 @@ import { Button } from '@/components/ui/Button';
 
 export function LandingView() {
   const router = useRouter();
-  const [resumeHref, setResumeHref] = React.useState<string | null>(null);
+  const [hasSavedProfile, setHasSavedProfile] = React.useState(false);
 
   React.useEffect(() => {
-    const saved = loadProfileFromSession();
-    if (saved) {
-      const sp = serializeProfile(saved);
-      setResumeHref(`/results?${sp.toString()}`);
-    }
+    setHasSavedProfile(Boolean(loadProfileFromSession()));
   }, []);
 
   return (
     <div className="flex flex-col min-h-screen">
       <Header />
 
-      <section className="max-w-column mx-auto w-full px-5 pt-7 md:pt-9 flex flex-col items-center text-center gap-5">
-        <h1 className="text-h1 font-bold text-ink-900">{ko.landing.h1}</h1>
-        <p className="text-body text-ink-700">{ko.landing.sub}</p>
-        <div className="w-full flex flex-col gap-2 mt-2">
-          <Button size="lg" fullWidth onClick={() => router.push('/onboarding?step=1')}>
-            {ko.landing.ctaPrimary}
-          </Button>
-          <p className="text-small text-ink-500">{ko.landing.ctaSubcopy}</p>
+      <section className="brand-key-art landing-hero max-w-column mx-auto w-full px-5 pt-7 md:pt-9 flex flex-col items-center text-center">
+        <div className="relative z-10 flex flex-col items-center gap-5 w-full">
+          <div className="flex items-center justify-center h-12 w-12 rounded-full bg-primary-tint" aria-hidden>
+            <Search size={22} className="text-primary" strokeWidth={2} />
+          </div>
+          <h1 className="text-h1 font-bold text-ink-900">{ko.landing.h1}</h1>
+          <p className="text-body text-ink-700">{ko.landing.sub}</p>
+          <div className="w-full flex flex-col gap-2 mt-2">
+            <Button size="lg" fullWidth onClick={() => router.push('/onboarding?step=1')}>
+              {ko.landing.ctaPrimary}
+            </Button>
+            <p className="text-small text-ink-500">{ko.landing.ctaSubcopy}</p>
+          </div>
+          {hasSavedProfile && (
+            <Button variant="link" onClick={() => router.push('/results')}>
+              {ko.landing.resumeLink} →
+            </Button>
+          )}
         </div>
-        {resumeHref && (
-          <Button variant="link" onClick={() => router.push(resumeHref)}>
-            {ko.landing.resumeLink} →
-          </Button>
-        )}
       </section>
 
       <section className="mt-8 md:mt-9 px-5">
