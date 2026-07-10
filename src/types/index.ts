@@ -65,7 +65,9 @@ export type BusinessIndustry = 'food' | 'manufacturing' | 'agriculture' | 'it' |
 export type Profile = {
   onboardingV: '5.0';
   region: { sido: string; sigungu: string | null };
-  birthYear: number;
+  /** ISO yyyy-mm-dd. Full date (not just year) so 만 나이 can be computed precisely —
+   * a year-only birth date can be off by one near the user's birthday. */
+  birthDate: string;
   gender: Gender;
   householdSize: number; // 1-7 (7 = "7명 이상")
   incomeBracket: IncomeBracket;
@@ -76,7 +78,7 @@ export type Profile = {
   interests: string[]; // 0-3 of INTEREST_OPTIONS keys
 };
 
-export type ReasonAttribute = '연령' | '관심지역' | '소득' | '신분' | '가구' | '관심분야';
+export type ReasonAttribute = '연령' | '관심지역' | '소득' | '신분' | '가구' | '임신출산' | '관심분야';
 
 export type Reason = {
   attribute: ReasonAttribute;

@@ -1,18 +1,21 @@
-// UX writing — transcribed verbatim from design_spec_youthfundlens_v4.md §4 and
-// PRD_v5_청년지원금렌즈.md §4, so this file is the single source of truth for copy.
+// UX writing — base copy transcribed from design_spec_youthfundlens_v4.md §4 and
+// PRD_v5_청년지원금렌즈.md §4; revised 2026-07-10 per docs/youth-subsidy-lens_copy-audit.md
+// (Toss 8-writing-principles framework) and direct CEO copy requests. This file is
+// the single source of truth for copy.
 export const ko = {
   app: { name: '청년지원금렌즈' },
   header: { back: '뒤로' },
   landing: {
     h1: '청년지원금렌즈',
-    sub: '만 19–34세 청년이 9가지 프로필을 입력하면 자격되는 정부 지원금과 이유를 함께 보여줍니다',
+    sub: '9가지만 답하면, 만 19–34세 청년이 받을 수 있는 정부 지원금과 그 이유를 알려드려요',
     ctaPrimary: '지원금 확인하기',
-    ctaSubcopy: '3분 안에 9가지만 답하면 됩니다. 로그인/개인정보 수집 없이.',
-    resumeLink: '저번에 입력한 프로필로 다시 보기 →',
+    ctaSubcopy: '3분이면 끝나요. 로그인이나 개인정보 수집도 없어요.',
+    resumeLink: '지난번에 입력한 프로필로 다시 보기 →',
     personalHeader: '🎯 나에게 맞는 지원금',
     seeAllResults: '전체 결과 보기 →',
     hotHeader: '🔥 요즘 조회수 높은 정책',
     hotSub: '정부24 조회수 기준 인기 정책이에요',
+    hotIntroForNewVisitor: '먼저 인기 정책부터 둘러보셔도 좋아요. 내 조건에 맞는 것만 보려면 위 버튼을 눌러주세요.',
     allProgramsLink: (n: number) => `📋 모든 정책 보기 (${n.toLocaleString('ko-KR')}건)`,
     disclaimer:
       '이 서비스는 대한민국 청년 지원금 프로그램을 대상으로 하며, 실제 자격은 각 프로그램 공식 페이지에서 최종 확인이 필요합니다.',
@@ -23,7 +26,7 @@ export const ko = {
     back: '뒤로',
     next: '다음',
     finish: '지원금 보기',
-    privacyMicro: '이 정보는 서버에 저장되지 않으며 매칭에만 사용됩니다',
+    privacyMicro: '이 정보는 서버에 저장되지 않고, 지원금 매칭에만 잠깐 쓰여요.',
     step1: {
       title: '어디 살아요?',
       hint: '시/도는 꼭 골라주세요. 시/군/구는 선택이에요.',
@@ -35,11 +38,11 @@ export const ko = {
       emptyResult: (q: string) => `'${q}'에 해당하는 시/군/구가 없어요`,
     },
     step2: {
-      title: '몇 년도에 태어났어요?',
-      hint: '정확한 만 나이는 자동 계산해서 보여드려요.',
-      label: '출생연도',
-      placeholder: '선택해주세요',
+      title: '생년월일을 알려주세요',
+      hint: '정확한 만 나이를 계산하는 데 필요해요.',
+      label: '생년월일',
       ageResult: (n: number) => `만 ${n}세이시네요`,
+      outOfRange: '이 서비스는 만 19–34세 청년을 기준으로 만들었어요. 범위 밖이어도 계속 진행하면, 나이 무관 지원금은 그대로 보여드릴게요.',
     },
     step3: {
       title: '성별을 알려주세요',
@@ -49,15 +52,15 @@ export const ko = {
     step4: {
       titleA: '함께 사는 가족은 몇 명인가요? (본인 포함)',
       titleB: '월 세전 총소득은 얼마인가요?',
-      hintB: '가구원이 여러 명이면 모든 가족의 소득을 합쳐서 선택하세요. 정확하지 않아도 괜찮아요.',
+      hintB: '가구원이 여러 명이면, 모든 가족의 소득을 합쳐서 골라주세요. 정확하지 않아도 괜찮아요.',
       unknownOption: '잘 모르겠어요',
-      unknownBanner: '소득 필터 없이 진행하시겠어요? 결과가 더 넓게 나올 수 있어요.',
+      unknownBanner: '소득 필터 없이 진행할게요. 결과가 더 넓게 나올 수 있어요.',
     },
     step5: { title: '지금 신분이나 상태에 해당하는 걸 모두 골라주세요' },
     step6: { title: '가구·주거 상황에서 해당하는 걸 모두 골라주세요' },
     step7: {
       title: '임신·출산·육아와 관련된 상황이 있나요?',
-      none: '해당 없음',
+      hint: '해당하는 게 없으면 "해당 없음"을 골라주세요.',
     },
     step8: {
       titleStatus: '사업은 어떤 단계인가요?',
@@ -70,13 +73,15 @@ export const ko = {
     validationConflict: '해당사항 없음만 선택하시거나 다른 옵션을 선택해주세요',
   },
   results: {
-    banner: (n: number) => `총 ${n}건이 매칭되었어요`,
+    banner: (n: number) => `총 ${n}건이 매칭됐어요`,
+    categoryGuide: '원하는 카테고리를 선택해보세요',
     filterAll: '전체',
     filterOpen: '모집중',
     filterClosed: '마감',
     resetLink: '다시 입력',
     viewLink: '보기',
     viewCount: (n: number) => `${n.toLocaleString('ko-KR')}명 조회`,
+    loadingBenefits: '내 지원금을 찾는 중…',
     empty: {
       title: '조건에 맞는 지원금이 없어요',
       sub: '조건을 조금 넓혀볼까요?',
@@ -95,6 +100,7 @@ export const ko = {
     ctaApply: '공식 페이지에서 신청하기',
     error: '이 지원금 정보를 불러올 수 없어요.',
     backToList: '결과 리스트로 돌아가기',
+    deadlineUnknownNote: '확인 필요 — 마감일 정보를 찾지 못했어요. 아래 신청 방법에서 직접 확인해주세요.',
   },
   about: {
     homeLink: '← 홈으로',
@@ -105,7 +111,7 @@ export const ko = {
     dataBody: '정부24 청년 지원사업 8,255건 (2026년 7월 수집). 매월 검토 예정.',
     methodH2: '어떻게 매칭하는가',
     methodBody:
-      '지역, 연령, 소득, 신분·직업, 가구·주거, 임신·출산, 관심 분야 — 이 9가지 정보를 기반으로 규칙 기반(deterministic) 필터를 적용합니다. AI 추천이 아니라, 각 프로그램의 자격 요건과 프로필을 하나씩 비교합니다.',
+      '지역, 연령, 소득, 신분·직업, 가구·주거, 임신·출산, 관심 분야 — 이 9가지 정보를 기반으로 정해진 규칙에 따라 하나씩 비교해요. AI가 추천하는 게 아니라, 각 프로그램의 자격 요건과 당신의 답변을 그대로 맞춰보는 방식이에요.',
     notH2: '이 서비스가 하지 않는 것',
     notBullets: [
       '로그인/개인정보 수집 없음',

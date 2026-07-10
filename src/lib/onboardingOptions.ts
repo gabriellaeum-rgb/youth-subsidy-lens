@@ -9,36 +9,45 @@ export type FlagOption = {
   label: string;
   ja: string[];
   exclusive?: boolean; // selecting this clears every other option in the group
+  /** Independent hard gate (2026-07-10 requirement): if the benefit has ANY of this
+   * option's JA codes = Y, the benefit is hidden unless the user selected this exact
+   * option — regardless of overlap with any other flag (incl. the generic "none"
+   * code). Narrow options are the ones with a genuinely low Y-rate in the dataset
+   * (targeted programs); broad options (student/employee/jobseeker/single/nohouse/
+   * newmove/none) stay under the old "OR across selections, skip if untagged" rule
+   * since ~75-90% of rows are tagged Y on those regardless of the real audience. */
+  narrow?: boolean;
 };
 
 export const STATUS_OPTIONS: readonly FlagOption[] = [
   { key: 'student', emoji: '🎓', label: '대학생/대학원생 재학 중', ja: ['JA0320'] },
   { key: 'employee', emoji: '💼', label: '근로자 (직장 재직 중, 파트타임 포함)', ja: ['JA0326'] },
-  { key: 'jobseeker', emoji: '🔍', label: '구직자/실업자 (취업 준비 중)', ja: ['JA0327'] },
+  { key: 'jobseeker', emoji: '🔍', label: '구직 중 (취업 준비 중)', ja: ['JA0327'] },
   { key: 'business', emoji: '🌱', label: '창업자/사업 운영 중', ja: [] },
-  { key: 'agriculture', emoji: '🚜', label: '농·어·축·임업 종사', ja: ['JA0313', 'JA0314', 'JA0315', 'JA0316'] },
-  { key: 'disabled', emoji: '♿', label: '등록 장애인', ja: ['JA0328'] },
-  { key: 'veteran', emoji: '🎖️', label: '국가보훈대상자', ja: ['JA0329'] },
-  { key: 'illness', emoji: '🩺', label: '질병/질환자 (진단서 있음)', ja: ['JA0330'] },
+  { key: 'agriculture', emoji: '🚜', label: '농·어·축·임업 종사', ja: ['JA0313', 'JA0314', 'JA0315', 'JA0316'], narrow: true },
+  { key: 'disabled', emoji: '♿', label: '등록 장애인', ja: ['JA0328'], narrow: true },
+  { key: 'veteran', emoji: '🎖️', label: '국가보훈대상자', ja: ['JA0329'], narrow: true },
+  { key: 'illness', emoji: '🩺', label: '질병/질환자 (진단서 있음)', ja: ['JA0330'], narrow: true },
   { key: 'none', emoji: '', label: '위 어느 것에도 해당하지 않음', ja: ['JA0322'], exclusive: true },
 ] as const;
 
 export const HOUSEHOLD_OPTIONS: readonly FlagOption[] = [
   { key: 'single', emoji: '🏠', label: '1인 가구 (혼자 삶)', ja: ['JA0404'] },
   { key: 'nohouse', emoji: '🏡', label: '무주택 세대 (본인·가족 명의 집 없음)', ja: ['JA0412'] },
-  { key: 'multicultural', emoji: '🌐', label: '다문화 가족 (본인 또는 배우자가 외국 출신)', ja: ['JA0401'] },
-  { key: 'defector', emoji: '🇰🇷', label: '북한이탈주민', ja: ['JA0402'] },
-  { key: 'singleparent', emoji: '👨‍👧', label: '한부모 가정 / 조손 가정', ja: ['JA0403'] },
-  { key: 'manychild', emoji: '👨‍👩‍👧‍👦', label: '다자녀 가구 (자녀 3명 이상)', ja: ['JA0411'] },
+  { key: 'multicultural', emoji: '🌐', label: '다문화 가족 (본인 또는 배우자가 외국 출신)', ja: ['JA0401'], narrow: true },
+  { key: 'defector', emoji: '🇰🇷', label: '북한이탈주민', ja: ['JA0402'], narrow: true },
+  { key: 'singleparent', emoji: '👨‍👧', label: '한부모 가정 / 조손 가정', ja: ['JA0403'], narrow: true },
+  { key: 'manychild', emoji: '👨‍👩‍👧‍👦', label: '다자녀 가구 (자녀 3명 이상)', ja: ['JA0411'], narrow: true },
   { key: 'newmove', emoji: '🚚', label: '신규 전입 (최근 1년 내 이사)', ja: ['JA0413'] },
-  { key: 'extended', emoji: '👵', label: '확대가족 (부모/조부모 부양)', ja: ['JA0414'] },
+  { key: 'extended', emoji: '👵', label: '확대가족 (부모/조부모 부양)', ja: ['JA0414'], narrow: true },
   { key: 'none', emoji: '', label: '위 어느 것에도 해당하지 않음', ja: ['JA0410'], exclusive: true },
 ] as const;
 
 export const PREGNANCY_OPTIONS: readonly FlagOption[] = [
-  { key: 'preparing', emoji: '🌸', label: '예비 부모 / 난임 치료 중', ja: ['JA0301'] },
-  { key: 'pregnant', emoji: '🤰', label: '임신 중 (본인 또는 배우자)', ja: ['JA0302'] },
-  { key: 'newborn', emoji: '👶', label: '최근 2년 내 출산·입양', ja: ['JA0303'] },
+  { key: 'preparing', emoji: '🌸', label: '예비 부모 / 난임 치료 중', ja: ['JA0301'], narrow: true },
+  { key: 'pregnant', emoji: '🤰', label: '임신 중 (본인 또는 배우자)', ja: ['JA0302'], narrow: true },
+  { key: 'newborn', emoji: '👶', label: '최근 2년 내 출산·입양', ja: ['JA0303'], narrow: true },
+  { key: 'none', emoji: '', label: '해당 없음 (미혼이거나 계획 없음)', ja: [], exclusive: true },
 ] as const;
 
 export const BUSINESS_STATUS_OPTIONS = [

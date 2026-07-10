@@ -8,7 +8,7 @@ import { Skeleton } from '@/components/ui/Skeleton';
 import { ListCard } from './ListCard';
 import { ko } from '@/i18n/ko';
 import { useBenefits } from '@/lib/useBenefits';
-import { loadProfileFromSession, clearProfileFromSession, saveProfileToSession } from '@/lib/profile';
+import { loadProfileFromSession, saveProfileToSession } from '@/lib/profile';
 import { matches } from '@/lib/matching';
 import { sortResults } from '@/lib/sort';
 import { matchesStatusFilter, getDeadlineInfo } from '@/lib/deadline';
@@ -38,21 +38,24 @@ export function ResultsView() {
     return sortResults(benefitsState.benefits.map((b) => matches(profile, b)));
   }, [benefitsState, profile]);
 
+  // Status tab applied FIRST — category chip counts must reflect the active tab
+  // (전체/모집중/마감), otherwise the chips freeze at their 전체 numbers while the
+  // banner count changes, and the two visibly stop summing (copy-audit P0 bug).
+  const statusFilteredMatched = React.useMemo(() => {
+    return allMatched.filter((m) => matchesStatusFilter(getDeadlineInfo(m.benefit), statusFilter));
+  }, [allMatched, statusFilter]);
+
   const categoryCounts = React.useMemo(() => {
     const counts: Record<string, number> = {};
     for (const opt of CATEGORY_OPTIONS) {
-      counts[opt.tag] = allMatched.filter((m) => m.benefit.categoryTags.includes(opt.tag)).length;
+      counts[opt.tag] = statusFilteredMatched.filter((m) => m.benefit.categoryTags.includes(opt.tag)).length;
     }
     return counts;
-  }, [allMatched]);
+  }, [statusFilteredMatched]);
 
   const filtered = React.useMemo(() => {
-    return allMatched.filter((m) => {
-      if (!m.benefit.categoryTags.some((t) => categories.has(t))) return false;
-      if (!matchesStatusFilter(getDeadlineInfo(m.benefit), statusFilter)) return false;
-      return true;
-    });
-  }, [allMatched, categories, statusFilter]);
+    return statusFilteredMatched.filter((m) => m.benefit.categoryTags.some((t) => categories.has(t)));
+  }, [statusFilteredMatched, categories]);
 
   const visible = filtered.slice(0, visibleCount);
 
@@ -123,10 +126,11 @@ export function ResultsView() {
 
       <div className="px-5 py-4">
         <h2 className="text-h2 font-bold text-ink-900">
-          {benefitsState.status === 'loading' ? ko.common.loading : ko.results.banner(filtered.length)}
+          {benefitsState.status === 'loading' ? ko.results.loadingBenefits : ko.results.banner(filtered.length)}
         </h2>
       </div>
 
+      <p className="text-small text-ink-500 px-5 pb-2">{ko.results.categoryGuide}</p>
       <div className="flex gap-2 overflow-x-auto px-5 pb-2" role="group">
         {CATEGORY_OPTIONS.map((opt) => {
           const count = categoryCounts[opt.tag] ?? 0;
@@ -209,10 +213,7 @@ export function ResultsView() {
       >
         <button
           type="button"
-          onClick={() => {
-            clearProfileFromSession();
-            router.push('/onboarding');
-          }}
+          onClick={() => router.push('/onboarding')}
           className="text-small text-primary"
         >
           {ko.results.resetLink}

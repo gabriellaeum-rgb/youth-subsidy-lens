@@ -7,6 +7,7 @@ import type { Profile } from '@/types';
 import {
   DEFAULT_WIZARD_DRAFT,
   clearWizardDraft,
+  loadProfileFromSession,
   loadWizardDraft,
   saveProfileToSession,
   saveWizardDraft,
@@ -16,7 +17,7 @@ import { Button } from '@/components/ui/Button';
 import { ProgressBar } from '@/components/ui/ProgressBar';
 import { Header } from '@/components/layout/Header';
 import { SidoStep, SigunguStep } from './steps/RegionSteps';
-import { BirthYearStep, GenderStep } from './steps/BasicSteps';
+import { BirthDateStep, GenderStep } from './steps/BasicSteps';
 import { HouseholdIncomeStep } from './steps/HouseholdIncomeStep';
 import { FlagCheckboxGroup } from './FlagCheckboxGroup';
 import { BusinessStep } from './steps/BusinessStep';
@@ -49,6 +50,13 @@ function prevStep(current: Step, draft: WizardDraft): Step {
   return target ?? '1';
 }
 
+/** Converts a completed Profile back into wizard-draft shape so "다시 입력" (and any
+ * direct /onboarding visit while a profile already exists) starts every step
+ * pre-selected instead of blank — 2026-07-10 requirement. */
+function draftFromProfile(p: Profile): WizardDraft {
+  return { ...p };
+}
+
 export function OnboardingShell() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -60,7 +68,17 @@ export function OnboardingShell() {
   const [error, setError] = React.useState<string | undefined>();
 
   React.useEffect(() => {
-    setDraft(loadWizardDraft());
+    const existingDraft = loadWizardDraft();
+    const draftIsEmpty = !existingDraft.region?.sido && !existingDraft.birthDate;
+    if (draftIsEmpty) {
+      const savedProfile = loadProfileFromSession();
+      if (savedProfile) {
+        setDraft(draftFromProfile(savedProfile));
+        setHydrated(true);
+        return;
+      }
+    }
+    setDraft(existingDraft);
     setHydrated(true);
   }, []);
 
@@ -86,7 +104,7 @@ export function OnboardingShell() {
     const profile: Profile = {
       onboardingV: '5.0',
       region: { sido: draft.region!.sido, sigungu: draft.region!.sigungu ?? null },
-      birthYear: draft.birthYear!,
+      birthDate: draft.birthDate!,
       gender: draft.gender ?? 'undisclosed',
       householdSize: draft.householdSize ?? 1,
       incomeBracket: draft.incomeBracket ?? 'unknown',
@@ -107,10 +125,14 @@ export function OnboardingShell() {
       setError(ko.wizard.step1.errorSido);
       return;
     }
-    if (step === '2' && !draft.birthYear) {
+    if (step === '2' && !draft.birthDate) {
       return;
     }
-    if ((step === '5' && !draft.statusFlags?.length) || (step === '6' && !draft.householdFlags?.length)) {
+    if (
+      (step === '5' && !draft.statusFlags?.length) ||
+      (step === '6' && !draft.householdFlags?.length) ||
+      (step === '7' && !draft.pregnancyFlags?.length)
+    ) {
       return;
     }
     const n = nextStep(step, draft);
@@ -166,7 +188,7 @@ export function OnboardingShell() {
           <>
             <h1 className="text-h1 font-bold text-ink-900">{ko.wizard.step2.title}</h1>
             <p className="text-small text-ink-500 mt-2 mb-6">{ko.wizard.step2.hint}</p>
-            <BirthYearStep value={draft.birthYear} onChange={(birthYear) => setDraft((d) => ({ ...d, birthYear }))} />
+            <BirthDateStep value={draft.birthDate} onChange={(birthDate) => setDraft((d) => ({ ...d, birthDate }))} />
           </>
         )}
 
@@ -203,7 +225,8 @@ export function OnboardingShell() {
 
         {step === '7' && (
           <>
-            <h1 className="text-h1 font-bold text-ink-900 mb-6">{ko.wizard.step7.title}</h1>
+            <h1 className="text-h1 font-bold text-ink-900">{ko.wizard.step7.title}</h1>
+            <p className="text-small text-ink-500 mt-2 mb-6">{ko.wizard.step7.hint}</p>
             <FlagCheckboxGroup options={PREGNANCY_OPTIONS} selected={draft.pregnancyFlags ?? []} onChange={(pregnancyFlags) => setDraft((d) => ({ ...d, pregnancyFlags }))} />
           </>
         )}
@@ -225,15 +248,14 @@ export function OnboardingShell() {
             <InterestsStep selected={draft.interests ?? []} onChange={(interests) => setDraft((d) => ({ ...d, interests }))} />
           </>
         )}
-      </div>
 
-      <div
-        className="sticky bottom-0 px-5 pt-3 bg-white"
-        style={{ boxShadow: 'var(--shadow-sticky-cta)', paddingBottom: 'calc(12px + env(safe-area-inset-bottom))' }}
-      >
-        <Button size="lg" fullWidth onClick={handleNext}>
-          {step === '9' ? ko.wizard.finish : ko.wizard.next}
-        </Button>
+        {/* Inline, not sticky (2026-07-10 requirement): sits right after each step's
+            own options instead of pinned to the viewport bottom. */}
+        <div className="pt-6" style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}>
+          <Button size="lg" fullWidth onClick={handleNext}>
+            {step === '9' ? ko.wizard.finish : ko.wizard.next}
+          </Button>
+        </div>
       </div>
     </div>
   );

@@ -76,6 +76,7 @@ export function LandingView() {
       <section className="pt-6">
         <h2 className="text-h2 font-bold text-ink-900 px-5">{ko.landing.hotHeader}</h2>
         <p className="text-small text-ink-500 px-5 mt-1 mb-2">{ko.landing.hotSub}</p>
+        {!profile && <p className="text-small text-ink-500 px-5 mb-2">{ko.landing.hotIntroForNewVisitor}</p>}
         {state.status === 'loading' && (
           <div className="px-5 flex flex-col gap-3 py-2">
             {Array.from({ length: 5 }).map((_, i) => (

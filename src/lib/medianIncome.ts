@@ -24,10 +24,10 @@ function won(n: number): string {
 export function incomeOptionsFor(householdSize: number): { value: IncomeBracket; label: string }[] {
   const b = bracketsFor(householdSize);
   return [
-    { value: '0-50', label: `0원 ~ ${won(b.p50)} (중위소득 0~50%)` },
-    { value: '51-75', label: `${won(b.p50 + 1)} ~ ${won(b.p75)} (중위소득 51~75%)` },
-    { value: '76-100', label: `${won(b.p75 + 1)} ~ ${won(b.p100)} (중위소득 76~100%)` },
-    { value: '101-200', label: `${won(b.p100 + 1)} ~ ${won(b.p200)} (중위소득 101~200%)` },
-    { value: '200+', label: `${won(b.p200 + 1)} 이상 (중위소득 200% 초과)` },
+    { value: '0-50', label: `0원 ~ ${won(b.p50)} (기준 중위소득의 50% 이하)` },
+    { value: '51-75', label: `${won(b.p50 + 1)} ~ ${won(b.p75)} (기준 중위소득의 51~75%)` },
+    { value: '76-100', label: `${won(b.p75 + 1)} ~ ${won(b.p100)} (기준 중위소득의 76~100%)` },
+    { value: '101-200', label: `${won(b.p100 + 1)} ~ ${won(b.p200)} (기준 중위소득의 101~200%)` },
+    { value: '200+', label: `${won(b.p200 + 1)} 이상 (기준 중위소득의 200% 초과)` },
   ];
 }

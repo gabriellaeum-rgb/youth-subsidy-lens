@@ -9,7 +9,7 @@ import { DdayBadge } from './ListCard';
 import { ko } from '@/i18n/ko';
 import { useBenefits, useBenefitDetail } from '@/lib/useBenefits';
 import { loadProfileFromSession } from '@/lib/profile';
-import { matches } from '@/lib/matching';
+import { matches, reasonSentence } from '@/lib/matching';
 import { getDeadlineInfo } from '@/lib/deadline';
 
 export function ProgramDetailView({ serviceId }: { serviceId: string }) {
@@ -74,7 +74,7 @@ export function ProgramDetailView({ serviceId }: { serviceId: string }) {
                   className="text-small text-primary rounded-md px-3 py-2"
                   style={{ background: 'var(--color-primary-tint)' }}
                 >
-                  ✓ {r.userValue} — {r.requirement}
+                  ✓ {reasonSentence(r)}
                 </p>
               ))}
             </div>
@@ -96,6 +96,7 @@ export function ProgramDetailView({ serviceId }: { serviceId: string }) {
         >
           <p className="text-body text-ink-700 whitespace-pre-line">{detail.method || '-'}</p>
           <p className="text-small text-ink-500 whitespace-pre-line mt-2">{detail.deadlineDisplay}</p>
+          {info.status === 'unknown' && <p className="text-small text-ink-500 mt-2">{ko.detail.deadlineUnknownNote}</p>}
         </Section>
 
         <Section title={ko.detail.contactHeader}>

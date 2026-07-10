@@ -27,13 +27,13 @@ afterEach(() => {
 const fullProfile: Profile = {
   onboardingV: '5.0',
   region: { sido: '서울', sigungu: '마포구' },
-  birthYear: 1998,
+  birthDate: '1998-05-14',
   gender: 'female',
   householdSize: 2,
   incomeBracket: '76-100',
   statusFlags: ['employee'],
   householdFlags: ['single'],
-  pregnancyFlags: [],
+  pregnancyFlags: ['none'],
   business: null,
   interests: ['housing'],
 };
@@ -54,7 +54,7 @@ describe('saveProfileToSession / loadProfileFromSession round-trip', () => {
     expect(loadProfileFromSession()).toBeNull();
   });
 
-  test('malformed stored value (missing sido/birthYear) returns null', () => {
+  test('malformed stored value (missing sido/birthDate) returns null', () => {
     (globalThis as unknown as { window: { sessionStorage: Storage } }).window.sessionStorage.setItem(
       'yfl:profile',
       JSON.stringify({ foo: 'bar' }),

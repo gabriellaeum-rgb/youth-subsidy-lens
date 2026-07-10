@@ -2,7 +2,10 @@ import type { Profile } from '@/types';
 
 // PRD v5 §F2-AC2.7: sessionStorage (not localStorage — O43 stays "session" per the
 // existing privacy default; browser-session end = fresh visitor, which is fine, the
-// resume link just won't show). Forbidden fields: no income_amount, no raw birthdate.
+// resume link just won't show). No income_amount is stored (bracket string only).
+// Full birthDate (not just year) IS stored as of 2026-07-10 — a direct CEO override
+// of the earlier "no raw birthdate" rule, needed to compute 만 나이 precisely. Still
+// client-only/ephemeral (sessionStorage, never sent to a server).
 const STORAGE_KEY = 'yfl:profile';
 const DRAFT_KEY = 'yfl:profile:draft';
 
@@ -21,7 +24,7 @@ export function loadProfileFromSession(): Profile | null {
     const raw = window.sessionStorage.getItem(STORAGE_KEY);
     if (!raw) return null;
     const parsed = JSON.parse(raw) as Profile;
-    if (!parsed?.region?.sido || typeof parsed.birthYear !== 'number') return null;
+    if (!parsed?.region?.sido || typeof parsed.birthDate !== 'string') return null;
     return parsed;
   } catch {
     return null;

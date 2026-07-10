@@ -1,5 +1,5 @@
-import { describe, test, expect, beforeAll } from 'vitest';
-import { matches, setJaCols } from '../src/lib/matching';
+import { describe, test, expect, beforeAll, beforeEach, afterEach, vi } from 'vitest';
+import { matches, setJaCols, currentAge } from '../src/lib/matching';
 import type { Benefit, Profile } from '../src/types';
 
 const JA_COLS = [
@@ -36,30 +36,52 @@ function benefit(overrides: Partial<Benefit> & { on?: string[] } = {}): Benefit 
   };
 }
 
+function birthDateForAge(age: number): string {
+  const today = new Date();
+  return `${today.getFullYear() - age}-06-15`;
+}
+
 const baseProfile: Profile = {
   onboardingV: '5.0',
   region: { sido: '서울', sigungu: null },
-  birthYear: new Date().getFullYear() - 25,
+  birthDate: birthDateForAge(25),
   gender: 'undisclosed',
   householdSize: 1,
   incomeBracket: 'unknown',
   statusFlags: ['none'],
   householdFlags: ['none'],
-  pregnancyFlags: [],
+  pregnancyFlags: ['none'],
   business: null,
   interests: [],
 };
 
-describe('Age (rule a)', () => {
-  test('excludes below range', () => expect(matches({ ...baseProfile, birthYear: new Date().getFullYear() - 18 }, benefit()).matched).toBe(false));
-  test('excludes above range', () => expect(matches({ ...baseProfile, birthYear: new Date().getFullYear() - 35 }, benefit()).matched).toBe(false));
-  test('includes at bounds', () => {
-    expect(matches({ ...baseProfile, birthYear: new Date().getFullYear() - 19 }, benefit()).matched).toBe(true);
-    expect(matches({ ...baseProfile, birthYear: new Date().getFullYear() - 34 }, benefit()).matched).toBe(true);
+describe('currentAge — birthday-aware 만 나이', () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-06-15T00:00:00'));
+  });
+  afterEach(() => vi.useRealTimers());
+
+  test('birthday already passed this year -> straight year difference', () => {
+    expect(currentAge('2000-01-01')).toBe(26);
+    expect(currentAge('2000-06-15')).toBe(26); // birthday is today
+  });
+  test('birthday not yet reached this year -> one less than year difference', () => {
+    expect(currentAge('2000-06-16')).toBe(25);
+    expect(currentAge('2000-12-31')).toBe(25);
   });
 });
 
-describe('Region (rule b)', () => {
+describe('Age (rule a)', () => {
+  test('excludes below range', () => expect(matches({ ...baseProfile, birthDate: birthDateForAge(18) }, benefit()).matched).toBe(false));
+  test('excludes above range', () => expect(matches({ ...baseProfile, birthDate: birthDateForAge(35) }, benefit()).matched).toBe(false));
+  test('includes at bounds', () => {
+    expect(matches({ ...baseProfile, birthDate: birthDateForAge(19) }, benefit()).matched).toBe(true);
+    expect(matches({ ...baseProfile, birthDate: birthDateForAge(34) }, benefit()).matched).toBe(true);
+  });
+});
+
+describe('Region (rule b) — only the relevant 소관기관 shows up', () => {
   test('national (regionSido=null) matches any sido', () => {
     expect(matches(baseProfile, benefit({ regionSido: null })).matched).toBe(true);
   });
@@ -87,28 +109,50 @@ describe('Income (rule c)', () => {
   });
 });
 
-describe('Status/household OR-groups (rules d/e) — zero-leakage + zero-flag passthrough', () => {
+describe('Status narrow gates (rule d) — 농어축임업/장애인/보훈/질환자', () => {
   test('benefit with zero status flags is open to everyone (untagged data, not narrow)', () => {
     expect(matches({ ...baseProfile, statusFlags: ['employee'] }, benefit({ on: [] })).matched).toBe(true);
   });
-  test('narrow status program requires the matching opt-in', () => {
+  test('disabled-targeted benefit requires the matching opt-in', () => {
     const disabledOnly = benefit({ on: ['JA0328'] });
     expect(matches({ ...baseProfile, statusFlags: ['none'] }, disabledOnly).matched).toBe(false);
     expect(matches({ ...baseProfile, statusFlags: ['disabled'] }, disabledOnly).matched).toBe(true);
   });
-  test('narrow household program requires the matching opt-in', () => {
-    const singleOnly = benefit({ on: ['JA0404'] });
-    expect(matches({ ...baseProfile, householdFlags: ['none'] }, singleOnly).matched).toBe(false);
-    expect(matches({ ...baseProfile, householdFlags: ['single'] }, singleOnly).matched).toBe(true);
+  test('regression: a generic "해당없음"(JA0322) flag on the SAME row cannot leak a narrow benefit through', () => {
+    // Before the independent-gate fix, a benefit Y-flagged on both JA0328 (disabled)
+    // and JA0322 (해당없음 — ~37% of all rows) would match a non-disabled user who
+    // picked "none", because the OR-check only needed ANY overlapping code.
+    const disabledButAlsoGeneric = benefit({ on: ['JA0328', 'JA0322'] });
+    expect(matches({ ...baseProfile, statusFlags: ['none'] }, disabledButAlsoGeneric).matched).toBe(false);
+    expect(matches({ ...baseProfile, statusFlags: ['disabled'] }, disabledButAlsoGeneric).matched).toBe(true);
   });
 });
 
-describe('Pregnancy (rule f) — default skipped', () => {
-  test('empty pregnancyFlags never excludes, even if benefit is narrow', () => {
-    expect(matches({ ...baseProfile, pregnancyFlags: [] }, benefit({ on: ['JA0302'] })).matched).toBe(true);
+describe('Household narrow gates (rule e) — 다문화/북한이탈/한부모/다자녀/확대가족', () => {
+  test('benefit with zero household flags is open to everyone', () => {
+    expect(matches({ ...baseProfile, householdFlags: ['single'] }, benefit({ on: [] })).matched).toBe(true);
   });
-  test('once user opts in, narrow benefit requires the matching flag', () => {
+  test('multicultural-targeted benefit requires the matching opt-in even if also generically tagged', () => {
+    const multiculturalButGeneric = benefit({ on: ['JA0401', 'JA0410'] }); // JA0410 = 해당없음, ~90% of rows
+    expect(matches({ ...baseProfile, householdFlags: ['none'] }, multiculturalButGeneric).matched).toBe(false);
+    expect(matches({ ...baseProfile, householdFlags: ['multicultural'] }, multiculturalButGeneric).matched).toBe(true);
+  });
+  test('broad codes (1인가구/무주택/신규전입) still use OR-with-skip, not a hard gate', () => {
+    const singleHouseholdOnly = benefit({ on: ['JA0404'] });
+    expect(matches({ ...baseProfile, householdFlags: ['none'] }, singleHouseholdOnly).matched).toBe(false);
+    expect(matches({ ...baseProfile, householdFlags: ['single'] }, singleHouseholdOnly).matched).toBe(true);
+  });
+});
+
+describe('Pregnancy (rule f) — now a required, always-gated axis', () => {
+  test('selecting "none" (미혼/계획없음) excludes narrow pregnancy benefits', () => {
+    expect(matches({ ...baseProfile, pregnancyFlags: ['none'] }, benefit({ on: ['JA0302'] })).matched).toBe(false);
+  });
+  test('matching circumstance passes, mismatched circumstance excludes', () => {
     expect(matches({ ...baseProfile, pregnancyFlags: ['preparing'] }, benefit({ on: ['JA0302'] })).matched).toBe(false);
     expect(matches({ ...baseProfile, pregnancyFlags: ['pregnant'] }, benefit({ on: ['JA0302'] })).matched).toBe(true);
+  });
+  test('benefit with zero pregnancy flags is open regardless of answer', () => {
+    expect(matches({ ...baseProfile, pregnancyFlags: ['none'] }, benefit({ on: [] })).matched).toBe(true);
   });
 });
