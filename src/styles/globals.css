@@ -68,22 +68,24 @@ body {
   }
 }
 
-/* Landing hero brand backdrop (design_spec_v3 §D) — CSS-only gradient blur, desktop
-   only. Never painted on <768px so the smallest, most bandwidth-constrained viewport
-   stays plainest and the CTA-above-fold rule (v2 AC5.3) can never be pushed down. */
-.landing-hero {
-  position: relative;
-  overflow: hidden;
+/* Mobile-only lock (design spec v4 §2.1 / PRD v5 AC1.1). The app is designed for a
+   390-430px phone viewport and nothing else — no desktop layout exists. On wider
+   viewports the content stays pinned to 430px with a flat gray backdrop filling the
+   rest, which doubles as a visual signal that this is a mobile-only product. No live
+   CSS gradient is used anywhere (design spec v4 principle #5) — gradients only ever
+   appear as static PNG assets (logo, favicon, OG image). */
+html,
+body {
+  background: var(--color-ink-050);
+  color-scheme: light; /* N35: dark mode out of scope, force light even if OS prefers dark */
 }
-@media (min-width: 768px) {
-  .landing-hero::before {
-    content: '';
-    position: absolute;
-    inset: -20% -10% auto -10%;
-    height: 480px;
-    background: var(--gradient-brand-soft);
-    filter: blur(48px);
-    pointer-events: none;
-    z-index: 0;
-  }
+.app-container {
+  max-width: var(--mobile-max-width);
+  width: 100%;
+  margin-inline: auto;
+  min-height: 100dvh;
+  background: var(--color-white);
+  position: relative;
+  display: flex;
+  flex-direction: column;
 }

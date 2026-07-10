@@ -17,6 +17,11 @@
   --color-bg: #ffffff;
   --color-bg-subtle: #f6f7fb;
   --color-bg-inset: #f0f2f7;
+  --color-white: #ffffff;
+  --color-ink-050: #f5f6f8;
+  --color-border: #e5e7eb;
+  --shadow-sticky-cta: 0 -4px 12px rgba(11, 18, 32, 0.06);
+  --mobile-max-width: 430px;
 
   /* Semantic */
   --color-success: #0ea371;
@@ -112,53 +117,13 @@
 }
 
 /*
- * Dark theme (F6-AC6.5–6.9) — follows OS/browser prefers-color-scheme only, no manual
- * toggle UI. Every value below was computed against its actual pairing with a WCAG
- * contrast calculator (not a mechanical color invert) — see the design spec's own
- * warning that primary-tint-style tokens need dedicated dark variants, not an invert.
- * Verified pairings (relative luminance formula, WCAG 2.x):
- *   ink-900/700/500 on bg/bg-subtle:      6.4–17.6:1  (body-text AA target 4.5:1)
- *   primary (#6B8CF5) on bg:               6.0:1
- *   primary-ink (#0B0F1F) on primary btn:  6.1:1
- *   primary on primary-tint:               5.0:1
- *   success/warning/muted/danger on tint:  5.8–8.5:1
- * primary-pressed on dark ink lands at 4.41:1, just under the 4.5 body-text line —
- * accepted as-is since it only ever paints for the duration of a pointer-down.
+ * Dark mode is explicitly OUT OF SCOPE for v5 (PRD v5 N35 / design spec v4 §6):
+ * "다크모드 미지원, OS 설정에서 다크 강제 시에도 라이트 렌더". The v3/v4 dark-theme
+ * token block used to live here behind `@media (prefers-color-scheme: dark)`; it's
+ * removed (not just unused) because leaving it in silently reintroduces dark mode for
+ * any visitor with a dark OS/browser preference — exactly what N35 forbids. Restore
+ * from git history when the Grow-stage revision (O40) actually picks this back up.
  */
-@media (prefers-color-scheme: dark) {
-  :root {
-    --color-primary: #6b8cf5;
-    --color-primary-hover: #5b7ce8;
-    --color-primary-pressed: #4c6ef5;
-    --color-primary-tint: #1a2140;
-    --color-primary-ink: #0b0f1f;
-
-    --color-ink-900: #f5f7fa;
-    --color-ink-700: #c9ced8;
-    --color-ink-500: #9096a6;
-    --color-ink-300: #3a4150;
-    --color-ink-100: #20242d;
-
-    --color-bg: #0e1116;
-    --color-bg-subtle: #161a22;
-    --color-bg-inset: #1d222c;
-
-    --color-success: #34d399;
-    --color-success-tint: #10241c;
-    --color-warning: #f0a93b;
-    --color-warning-tint: #2a1d0c;
-    --color-muted: #9ca3af;
-    --color-muted-tint: #1d212b;
-    --color-danger: #f06b72;
-    --color-danger-tint: #2a1416;
-    --color-info: #6b8cf5;
-
-    --color-focus-ring: rgba(107, 140, 245, 0.45);
-
-    --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(255, 255, 255, 0.06);
-    --shadow-raised: 0 4px 12px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.06);
-  }
-}
 
 @media (prefers-reduced-motion: reduce) {
   :root {

@@ -11,7 +11,7 @@ export const metadata: Metadata = {
 
 export default function AboutPage() {
   return (
-    <div className="flex flex-col min-h-screen">
+    <div className="flex flex-col flex-1">
       <Header />
       <div className="max-w-column mx-auto w-full px-5 py-6 flex flex-col gap-8">
         <Link href="/" className="text-body text-ink-700 hover:text-ink-900 font-medium w-fit">

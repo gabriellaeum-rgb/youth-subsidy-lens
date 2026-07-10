@@ -1,184 +1,223 @@
 'use client';
 
 import * as React from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
-import Link from 'next/link';
-import { ko } from '@/i18n/ko';
-import { loadProfileFromSession } from '@/lib/profile';
-import { runMatching } from '@/lib/pipeline';
-import { usePrograms, DEMO_DATASET_THRESHOLD } from '@/lib/usePrograms';
-import type { Profile } from '@/types';
-import { ResultCard } from './ResultCard';
-import { ResultCardSkeleton } from '@/components/ui/Skeleton';
-import { EmptyState } from './EmptyState';
-import { ProfileSummary } from './ProfileSummary';
-import { DisclaimerStrip } from '@/components/layout/DisclaimerStrip';
-import { Footer } from '@/components/layout/Footer';
+import { useRouter } from 'next/navigation';
+import { Header } from '@/components/layout/Header';
 import { Button } from '@/components/ui/Button';
+import { Skeleton } from '@/components/ui/Skeleton';
+import { ListCard } from './ListCard';
+import { ko } from '@/i18n/ko';
+import { useBenefits } from '@/lib/useBenefits';
+import { loadProfileFromSession, clearProfileFromSession, saveProfileToSession } from '@/lib/profile';
+import { matches } from '@/lib/matching';
+import { sortResults } from '@/lib/sort';
+import { matchesStatusFilter, getDeadlineInfo } from '@/lib/deadline';
+import { countWithoutIncomeFilter, isAgeOutOfRange } from '@/lib/emptyStateHint';
+import { CATEGORY_OPTIONS, type Benefit, type CategoryTag, type Profile } from '@/types';
 
-type FilterValue = 'all' | 'open' | 'closed';
-
-function isFeatured(index: number, reasonCount: number, hasSpecReason: boolean, groupHasFeatured: boolean[]): boolean {
-  const groupIndex = Math.floor(index / 6);
-  const qualifies = reasonCount >= 4 || hasSpecReason;
-  if (!qualifies) return false;
-  if (groupHasFeatured[groupIndex]) return false;
-  groupHasFeatured[groupIndex] = true;
-  return true;
-}
+const PAGE_SIZE = 20;
+type StatusFilter = '전체' | '모집중' | '마감';
 
 export function ResultsView() {
   const router = useRouter();
-  const searchParams = useSearchParams();
-  const programsState = usePrograms();
-
-  // Profile lives only in sessionStorage (F0-AC0.2) — never in the URL. Checked once on
-  // mount; a distinct empty screen (not F3's zero-match state) covers the "no profile at
-  // all" case (e.g. a fresh tab opened directly on /results).
+  const benefitsState = useBenefits();
   const [profile, setProfile] = React.useState<Profile | null | undefined>(undefined);
+  const [categories, setCategories] = React.useState<Set<CategoryTag>>(
+    () => new Set(CATEGORY_OPTIONS.map((c) => c.tag)),
+  );
+  const [statusFilter, setStatusFilter] = React.useState<StatusFilter>('전체');
+  const [visibleCount, setVisibleCount] = React.useState(PAGE_SIZE);
+  const sentinelRef = React.useRef<HTMLDivElement>(null);
+
   React.useEffect(() => {
     setProfile(loadProfileFromSession());
   }, []);
 
-  const filter = (searchParams.get('filter') as FilterValue) || 'all';
+  const allMatched = React.useMemo(() => {
+    if (benefitsState.status !== 'ready' || !profile) return [];
+    return sortResults(benefitsState.benefits.map((b) => matches(profile, b)));
+  }, [benefitsState, profile]);
 
-  function setFilter(next: FilterValue) {
-    const sp = new URLSearchParams();
-    sp.set('filter', next);
-    router.push(`/results?${sp.toString()}`);
+  const categoryCounts = React.useMemo(() => {
+    const counts: Record<string, number> = {};
+    for (const opt of CATEGORY_OPTIONS) {
+      counts[opt.tag] = allMatched.filter((m) => m.benefit.categoryTags.includes(opt.tag)).length;
+    }
+    return counts;
+  }, [allMatched]);
+
+  const filtered = React.useMemo(() => {
+    return allMatched.filter((m) => {
+      if (!m.benefit.categoryTags.some((t) => categories.has(t))) return false;
+      if (!matchesStatusFilter(getDeadlineInfo(m.benefit), statusFilter)) return false;
+      return true;
+    });
+  }, [allMatched, categories, statusFilter]);
+
+  const visible = filtered.slice(0, visibleCount);
+
+  React.useEffect(() => {
+    const el = sentinelRef.current;
+    if (!el) return;
+    const io = new IntersectionObserver((entries) => {
+      if (entries[0]?.isIntersecting) setVisibleCount((c) => Math.min(filtered.length, c + PAGE_SIZE));
+    });
+    io.observe(el);
+    return () => io.disconnect();
+  }, [filtered.length]);
+
+  function toggleCategory(tag: CategoryTag) {
+    setCategories((prev) => {
+      const next = new Set(prev);
+      if (next.has(tag)) next.delete(tag);
+      else next.add(tag);
+      return next;
+    });
+    setVisibleCount(PAGE_SIZE);
+  }
+
+  function dropIncomeFilter() {
+    if (!profile) return;
+    const relaxed: Profile = { ...profile, incomeBracket: 'unknown' };
+    saveProfileToSession(relaxed);
+    setProfile(relaxed);
   }
 
   if (profile === undefined) return null;
 
   if (profile === null) {
     return (
-      <div className="max-w-column mx-auto px-5 py-9 text-center flex flex-col items-center gap-4 min-h-screen justify-center">
-        <h2 className="text-h2 font-bold text-ink-900">{ko.results.noProfile.title}</h2>
-        <p className="text-body text-ink-500">{ko.results.noProfile.body}</p>
-        <Button variant="primary" size="lg" onClick={() => router.push('/onboarding?step=1')}>
-          {ko.results.noProfile.cta}
-        </Button>
-      </div>
-    );
-  }
-
-  if (programsState.status === 'loading') {
-    return (
-      <div className="max-w-content mx-auto px-5 md:px-6 py-6">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-          {Array.from({ length: 4 }).map((_, i) => (
-            <ResultCardSkeleton key={i} />
-          ))}
+      <div className="flex flex-col flex-1">
+        <Header />
+        <div className="flex-1 flex flex-col items-center justify-center gap-4 px-5 text-center">
+          <p className="text-h2 font-bold text-ink-900">{ko.results.noProfile.title}</p>
+          <Button onClick={() => router.push('/onboarding')}>{ko.results.noProfile.cta}</Button>
         </div>
       </div>
     );
   }
 
-  if (programsState.status === 'error') {
+  if (benefitsState.status === 'error') {
     return (
-      <div className="max-w-column mx-auto px-5 py-9 text-center flex flex-col items-center gap-4">
-        <h2 className="text-h2 font-bold text-ink-900">{ko.results.dataError.title}</h2>
-        <p className="text-body text-ink-500">{ko.results.dataError.body}</p>
-        <Button variant="primary" onClick={() => window.location.reload()}>
-          {ko.results.dataError.cta}
-        </Button>
+      <div className="flex flex-col flex-1">
+        <Header />
+        <div className="flex-1 flex flex-col items-center justify-center gap-4 px-5 text-center">
+          <p className="text-body text-ink-700">{ko.results.error.title}</p>
+          <Button variant="secondary" onClick={() => window.location.reload()}>
+            {ko.results.error.retry}
+          </Button>
+        </div>
       </div>
     );
   }
 
-  const isDemoDataset = programsState.programs.length < DEMO_DATASET_THRESHOLD;
-  const allMatched = runMatching(profile, programsState.programs);
-  const matched =
-    filter === 'open'
-      ? allMatched.filter((r) => r.program.모집상태 === '모집중')
-      : filter === 'closed'
-        ? allMatched.filter((r) => r.program.모집상태 === '마감')
-        : allMatched;
-
-  const closedCount = allMatched.filter((r) => r.program.모집상태 === '마감').length;
-  const groupHasFeatured: boolean[] = [];
+  const ageOut = benefitsState.status === 'ready' && isAgeOutOfRange(profile, benefitsState.benefits);
+  const incomeGain =
+    benefitsState.status === 'ready' && profile.incomeBracket !== 'unknown'
+      ? countWithoutIncomeFilter(profile, benefitsState.benefits)
+      : 0;
 
   return (
-    <div className="flex flex-col min-h-screen">
-      <div className="max-w-content mx-auto w-full px-5 md:px-6 py-4">
-        <Link href="/onboarding?step=1" className="text-body text-ink-700 hover:text-ink-900 font-medium">
-          {ko.results.back}
-        </Link>
+    <div className="flex flex-col flex-1">
+      <Header />
+
+      <div className="px-5 py-4">
+        <h2 className="text-h2 font-bold text-ink-900">
+          {benefitsState.status === 'loading' ? ko.common.loading : ko.results.banner(filtered.length)}
+        </h2>
       </div>
 
-      <div className="max-w-content mx-auto w-full px-5 md:px-6 flex flex-col gap-5">
-        {isDemoDataset && (
-          <p className="rounded-md bg-warning-tint text-warning text-small font-medium px-4 py-3">
-            {ko.results.demoBanner}
-          </p>
-        )}
+      <div className="flex gap-2 overflow-x-auto px-5 pb-2" role="group">
+        {CATEGORY_OPTIONS.map((opt) => {
+          const count = categoryCounts[opt.tag] ?? 0;
+          const disabled = count === 0;
+          const selected = categories.has(opt.tag);
+          return (
+            <button
+              key={opt.tag}
+              type="button"
+              disabled={disabled}
+              onClick={() => toggleCategory(opt.tag)}
+              className="shrink-0 rounded-pill px-4 h-10 text-small border whitespace-nowrap"
+              style={{
+                background: disabled ? 'var(--color-ink-050)' : selected ? 'var(--color-primary)' : 'var(--color-white)',
+                color: disabled ? 'var(--color-ink-300)' : selected ? '#fff' : 'var(--color-ink-700)',
+                borderColor: selected ? 'var(--color-primary)' : 'var(--color-border)',
+              }}
+            >
+              {opt.emoji} {opt.label} ({count})
+            </button>
+          );
+        })}
+      </div>
 
-        <ProfileSummary profile={profile} />
+      <div className="flex gap-1 px-5 pb-3">
+        {(['전체', '모집중', '마감'] as StatusFilter[]).map((f) => (
+          <button
+            key={f}
+            type="button"
+            onClick={() => {
+              setStatusFilter(f);
+              setVisibleCount(PAGE_SIZE);
+            }}
+            className="flex-1 h-10 rounded-md text-small"
+            style={{
+              background: statusFilter === f ? 'var(--color-white)' : 'transparent',
+              fontWeight: statusFilter === f ? 700 : 400,
+              boxShadow: statusFilter === f ? 'var(--shadow-card)' : 'none',
+            }}
+          >
+            {f === '전체' ? ko.results.filterAll : f === '모집중' ? ko.results.filterOpen : ko.results.filterClosed}
+          </button>
+        ))}
+      </div>
 
-        {allMatched.length > 0 && (
+      {benefitsState.status === 'loading' && (
+        <div className="px-5 flex flex-col gap-3">
+          {Array.from({ length: 5 }).map((_, i) => (
+            <Skeleton key={i} className="h-[72px] w-full rounded-md" />
+          ))}
+        </div>
+      )}
+
+      {benefitsState.status === 'ready' && filtered.length === 0 && (
+        <div className="flex-1 flex flex-col items-center justify-center gap-3 px-5 text-center py-12">
+          <p className="text-h2 font-bold text-ink-900">{ko.results.empty.title}</p>
+          <p className="text-body text-ink-500">{ko.results.empty.sub}</p>
+          {!ageOut && incomeGain > 0 && <Button onClick={dropIncomeFilter}>{ko.results.empty.ctaIncome}</Button>}
+          <button type="button" onClick={() => router.push('/onboarding')} className="text-small text-primary mt-2">
+            {ko.results.empty.ctaRestart}
+          </button>
+        </div>
+      )}
+
+      {benefitsState.status === 'ready' && filtered.length > 0 && (
+        <>
           <div>
-            <h1 role="status" aria-live="polite" className="text-h1 font-bold text-ink-900">
-              {ko.results.countTitle(allMatched.length)}
-            </h1>
-            {closedCount > 0 && <p className="text-small text-ink-500 mt-1">{ko.results.countClosedSub(closedCount)}</p>}
-          </div>
-        )}
-
-        {allMatched.length > 0 && (
-          <div className="inline-flex rounded-pill border border-ink-300 p-1 w-fit">
-            {(
-              [
-                ['all', ko.results.filterAll],
-                ['open', ko.results.filterOpen],
-                ['closed', ko.results.filterClosed],
-              ] as const
-            ).map(([value, label]) => (
-              <button
-                key={value}
-                type="button"
-                onClick={() => setFilter(value)}
-                aria-pressed={filter === value}
-                className={`min-h-12 px-4 rounded-pill text-small font-medium transition-colors duration-fast focus-visible:outline-none focus-visible:shadow-focus ${
-                  filter !== value
-                    ? 'text-ink-700 hover:bg-bg-inset'
-                    : value === 'open'
-                      ? 'bg-success-tint text-success'
-                      : value === 'closed'
-                        ? 'bg-muted-tint text-muted'
-                        : 'bg-primary text-primary-ink'
-                }`}
-              >
-                {label}
-              </button>
+            {visible.map((m: { benefit: Benefit }) => (
+              <ListCard key={m.benefit.id} benefit={m.benefit} />
             ))}
           </div>
-        )}
+          <div ref={sentinelRef} style={{ height: 1 }} />
+        </>
+      )}
 
-        {allMatched.length === 0 ? (
-          <EmptyState profile={profile} programs={programsState.programs} />
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-5 pb-8">
-            {matched.map((r, i) => {
-              const hasSpecReason = r.reasons.some((reason) => reason.attribute === '특화분야');
-              const featured = isFeatured(i, r.reasons.length, hasSpecReason, groupHasFeatured);
-              return (
-                <ResultCard
-                  key={r.program.id}
-                  program={r.program}
-                  reasons={r.reasons}
-                  detailHref={`/results/${r.program.id}`}
-                  featured={featured}
-                />
-              );
-            })}
-          </div>
-        )}
-
-        <div className="py-6">
-          <DisclaimerStrip />
-        </div>
+      <div className="flex-1" />
+      <div
+        className="sticky bottom-0 px-5 py-3 text-center bg-white"
+        style={{ boxShadow: 'var(--shadow-sticky-cta)', paddingBottom: 'calc(12px + env(safe-area-inset-bottom))' }}
+      >
+        <button
+          type="button"
+          onClick={() => {
+            clearProfileFromSession();
+            router.push('/onboarding');
+          }}
+          className="text-small text-primary"
+        >
+          {ko.results.resetLink}
+        </button>
       </div>
-      <Footer />
     </div>
   );
 }

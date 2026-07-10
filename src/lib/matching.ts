@@ -1,128 +1,118 @@
-import type { MatchResult, Profile, Program, Reason } from '@/types';
-import { isHigherOrEqualEducation } from './education';
-import { SIDO_SHORT, type Sido } from './regions';
+import type { Benefit, MatchResult, Profile, Reason } from '@/types';
+import {
+  STATUS_OPTIONS,
+  HOUSEHOLD_OPTIONS,
+  PREGNANCY_OPTIONS,
+  BUSINESS_STATUS_OPTIONS,
+  BUSINESS_INDUSTRY_OPTIONS,
+  INTEREST_OPTIONS,
+  flagsToJaCodes,
+} from './onboardingOptions';
 
 const NO_MATCH: MatchResult = { matched: false, reasons: [] };
 
+const INCOME_JA: Record<string, string> = {
+  '0-50': 'JA0201',
+  '51-75': 'JA0202',
+  '76-100': 'JA0203',
+  '101-200': 'JA0204',
+  '200+': 'JA0205',
+};
+
+const STATUS_JA_CODES = ['JA0313', 'JA0314', 'JA0315', 'JA0316', 'JA0320', 'JA0322', 'JA0326', 'JA0327', 'JA0328', 'JA0329', 'JA0330'];
+const HOUSEHOLD_JA_CODES = ['JA0401', 'JA0402', 'JA0403', 'JA0404', 'JA0410', 'JA0411', 'JA0412', 'JA0413', 'JA0414'];
+const PREGNANCY_JA_CODES = ['JA0301', 'JA0302', 'JA0303'];
+
+let jaColsCache: string[] | null = null;
+export function setJaCols(cols: string[]): void {
+  jaColsCache = cols;
+}
+
+function hasFlag(benefit: Benefit, code: string): boolean {
+  if (!jaColsCache) throw new Error('setJaCols() must be called before matching (see loadDataset in useBenefits)');
+  const i = jaColsCache.indexOf(code);
+  return i >= 0 && benefit.jaBits[i] === '1';
+}
+
+function anyFlag(benefit: Benefit, codes: string[]): boolean {
+  return codes.some((c) => hasFlag(benefit, c));
+}
+
+function currentAge(birthYear: number): number {
+  return new Date().getFullYear() - birthYear;
+}
+
 /**
- * Deterministic, client-side matching. This is the product — see design spec §6.
+ * Deterministic, client-side matching — see design spec §6, PRD v5 §F5-AC5.4.
  * Every early return is an intentional exclusion. Do not add fallback matches.
+ *
+ * Engineering note (not in the PRD): a meaningful slice of rows carry ZERO true
+ * flags across an entire axis (18.5% for the status axis, e.g.) because the
+ * government export simply never tagged them. Hard-filtering by user-selection
+ * intersection against those rows would hide them from every possible user, which
+ * is worse than the alternative: treat "no flags set on this axis" as "this program
+ * doesn't discriminate on this axis" and skip the filter for that program.
  */
-export function matches(profile: Profile, program: Program): MatchResult {
+export function matches(profile: Profile, benefit: Benefit): MatchResult {
   const reasons: Reason[] = [];
+  const age = currentAge(profile.birthYear);
 
-  // (a) 연령 — mandatory pass/fail
-  if (!(program.나이_하한 <= profile.age && profile.age <= program.나이_상한)) {
-    return NO_MATCH;
-  }
-  reasons.push({
-    attribute: '연령',
-    userValue: `만 ${profile.age}세`,
-    requirement: `${program.나이_하한}–${program.나이_상한}세`,
-  });
+  // (a) 연령 — mandatory
+  if (!(benefit.ageStart <= age && age <= benefit.ageEnd)) return NO_MATCH;
+  reasons.push({ attribute: '연령', userValue: `만 ${age}세`, requirement: `${benefit.ageStart}~${benefit.ageEnd}세` });
 
-  // (b) 관심지역 — mandatory pass/fail (accepts long/short 시/도 forms)
-  const sidoLong = profile.region.sido;
-  const sidoShort = SIDO_SHORT[sidoLong as Sido] ?? sidoLong;
-  const region = program.거주_지역;
-  const regionOk =
-    region === '전국' ||
-    region === sidoLong ||
-    region === sidoShort ||
-    Boolean(profile.region.sigungu && region.includes(profile.region.sigungu));
-  if (!regionOk) return NO_MATCH;
-  reasons.push({
-    attribute: '관심지역',
-    userValue: profile.region.sigungu ? `${sidoShort} ${profile.region.sigungu}` : sidoShort,
-    requirement: region,
-  });
-
-  // (c) 최종학력 — filter only if program has a requirement
-  if (!isHigherOrEqualEducation(profile.education, program.최종학력_요건)) {
-    return NO_MATCH;
-  }
-  if (program.최종학력_요건 !== '제한없음') {
+  // (b) 지역 — mandatory (AC5.4): null sido = 전국(national); sigungu on the program requires exact match
+  if (benefit.regionSido) {
+    if (benefit.regionSido !== profile.region.sido) return NO_MATCH;
+    if (benefit.regionSigungu && benefit.regionSigungu !== profile.region.sigungu) return NO_MATCH;
     reasons.push({
-      attribute: '최종학력',
-      userValue: profile.education,
-      requirement: program.최종학력_요건,
+      attribute: '관심지역',
+      userValue: profile.region.sigungu ? `${profile.region.sido} ${profile.region.sigungu}` : profile.region.sido,
+      requirement: benefit.regionSigungu ? `${benefit.regionSido} ${benefit.regionSigungu}` : benefit.regionSido,
     });
   }
 
-  // (d) 전공요건
-  if (program.전공_요건 !== '제한없음' && program.전공_요건 !== profile.major) {
-    return NO_MATCH;
-  }
-  if (program.전공_요건 !== '제한없음') {
-    reasons.push({ attribute: '전공', userValue: profile.major, requirement: program.전공_요건 });
-  }
-
-  // (e) 혼인상태
-  if (program.혼인_요건 !== '제한없음' && program.혼인_요건 !== profile.marital) {
-    return NO_MATCH;
-  }
-  if (program.혼인_요건 !== '제한없음') {
-    reasons.push({ attribute: '혼인상태', userValue: profile.marital, requirement: program.혼인_요건 });
+  // (c) 소득 — filter only if user answered AND program discriminates by income at all
+  if (profile.incomeBracket !== 'unknown' && anyFlag(benefit, Object.values(INCOME_JA))) {
+    const code = INCOME_JA[profile.incomeBracket]!;
+    if (!hasFlag(benefit, code)) return NO_MATCH;
+    reasons.push({ attribute: '소득', userValue: profile.incomeBracket, requirement: '소득 구간 충족' });
   }
 
-  // (f) 취업상태
-  const workReq = program.취업상태_요건;
-  const workReqArr = Array.isArray(workReq) ? workReq : [workReq];
-  const workOk = workReqArr.includes('제한없음') || workReqArr.includes(profile.employment);
-  if (!workOk) return NO_MATCH;
-  if (!workReqArr.includes('제한없음')) {
-    reasons.push({
-      attribute: '취업상태',
-      userValue: profile.employment,
-      requirement: workReqArr.join(', '),
-    });
-  }
-
-  // (g) 특화분야 — M8 zero-leakage KPI. Bug #3 prevention.
-  const specReq = program.특화분야_요건 ?? [];
-  const hasRestriction = specReq.length > 0 && !(specReq.length === 1 && specReq[0] === '제한없음');
-  if (hasRestriction) {
-    const optedInto = specReq.filter((s) => profile.specialization.includes(s));
-    if (optedInto.length === 0) return NO_MATCH;
-    reasons.push({
-      attribute: '특화분야',
-      userValue: optedInto.join(', '),
-      requirement: specReq.join(', '),
-    });
-  }
-
-  // (h) 소득 — Bug #8 prevention. Filter only if BOTH program cap and user income are known.
-  if (program.개인_소득_상한 != null && profile.incomeManwon !== undefined) {
-    if (profile.incomeManwon > program.개인_소득_상한) {
-      return NO_MATCH;
+  // (d) 신분·직업 (+ 창업 세부) — OR match; skip if program has zero flags on this axis
+  if (anyFlag(benefit, STATUS_JA_CODES)) {
+    const userCodes = new Set(flagsToJaCodes(profile.statusFlags, STATUS_OPTIONS));
+    if (profile.business) {
+      BUSINESS_STATUS_OPTIONS.find((o) => o.value === profile.business!.status)?.ja.forEach((c) => userCodes.add(c));
+      BUSINESS_INDUSTRY_OPTIONS.find((o) => o.value === profile.business!.industry)?.ja.forEach((c) => userCodes.add(c));
     }
-    reasons.push({
-      attribute: '소득',
-      userValue: `월 ${profile.incomeManwon}만원`,
-      requirement: `월 ${program.개인_소득_상한}만원 이하`,
-    });
+    const hit = [...userCodes].some((c) => hasFlag(benefit, c));
+    if (!hit) return NO_MATCH;
+    reasons.push({ attribute: '신분', userValue: '해당 신분·직업 조건', requirement: '신분·직업 조건 충족' });
   }
 
-  return { matched: true, reasons, program };
-}
+  // (e) 가구·주거 — OR match; skip if program has zero flags on this axis
+  if (anyFlag(benefit, HOUSEHOLD_JA_CODES)) {
+    const userCodes = flagsToJaCodes(profile.householdFlags, HOUSEHOLD_OPTIONS);
+    const hit = userCodes.some((c) => hasFlag(benefit, c));
+    if (!hit) return NO_MATCH;
+    reasons.push({ attribute: '가구', userValue: '해당 가구·주거 조건', requirement: '가구·주거 조건 충족' });
+  }
 
-/** Display priority — different from matching order (a→h). Never mutate the source array. */
-const DISPLAY_ORDER: Reason['attribute'][] = [
-  '특화분야', '연령', '관심지역', '취업상태', '최종학력', '전공', '혼인상태', '소득',
-];
+  // (f) 임신·출산·육아 — only filters if user actually selected a circumstance (default = skip)
+  if (profile.pregnancyFlags.length > 0 && anyFlag(benefit, PREGNANCY_JA_CODES)) {
+    const userCodes = flagsToJaCodes(profile.pregnancyFlags, PREGNANCY_OPTIONS);
+    const hit = userCodes.some((c) => hasFlag(benefit, c));
+    if (!hit) return NO_MATCH;
+  }
 
-export function selectVisibleReasons(
-  reasons: Reason[],
-  limit = 2,
-): { visible: Reason[]; hiddenCount: number } {
-  const sorted = [...reasons].sort(
-    (a, b) => DISPLAY_ORDER.indexOf(a.attribute) - DISPLAY_ORDER.indexOf(b.attribute),
-  );
-  return { visible: sorted.slice(0, limit), hiddenCount: Math.max(0, sorted.length - limit) };
-}
+  // (g) 관심 분야 — soft signal only, surfaced as a reason + used by sort, never excludes
+  if (profile.interests.length > 0 && benefit.serviceField) {
+    const interestFields = profile.interests.map((k) => INTEREST_OPTIONS.find((o) => o.key === k)?.serviceField);
+    if (interestFields.includes(benefit.serviceField)) {
+      reasons.push({ attribute: '관심분야', userValue: benefit.serviceField, requirement: benefit.serviceField });
+    }
+  }
 
-export function sortReasonsForDisplay(reasons: Reason[]): Reason[] {
-  return [...reasons].sort(
-    (a, b) => DISPLAY_ORDER.indexOf(a.attribute) - DISPLAY_ORDER.indexOf(b.attribute),
-  );
+  return { matched: true, reasons, benefit };
 }

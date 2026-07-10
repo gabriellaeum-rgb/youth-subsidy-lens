@@ -1,96 +1,114 @@
-import { describe, test, expect } from 'vitest';
-import programs from '../public/data/programs.json';
-import { matches } from '../src/lib/matching';
-import { PROTECTED_SPECS, type Profile, type Program } from '../src/types';
+import { describe, test, expect, beforeAll } from 'vitest';
+import { matches, setJaCols } from '../src/lib/matching';
+import type { Benefit, Profile } from '../src/types';
 
-const typedPrograms = programs as unknown as Program[];
+const JA_COLS = [
+  'JA0201', 'JA0202', 'JA0203', 'JA0204', 'JA0205',
+  'JA0313', 'JA0314', 'JA0315', 'JA0316', 'JA0320', 'JA0322', 'JA0326', 'JA0327', 'JA0328', 'JA0329', 'JA0330',
+  'JA0401', 'JA0402', 'JA0403', 'JA0404', 'JA0410', 'JA0411', 'JA0412', 'JA0413', 'JA0414',
+  'JA0301', 'JA0302', 'JA0303',
+];
+
+beforeAll(() => setJaCols(JA_COLS));
+
+function bits(on: string[]): string {
+  return JA_COLS.map((c) => (on.includes(c) ? '1' : '0')).join('');
+}
+
+function benefit(overrides: Partial<Benefit> & { on?: string[] } = {}): Benefit {
+  const { on, ...rest } = overrides;
+  return {
+    id: 'b1',
+    name: '테스트 지원금',
+    agency: '보건복지부',
+    agencyType: '중앙행정기관',
+    categoryTags: ['현금성 지원'],
+    serviceField: '생활안정',
+    regionSido: null,
+    regionSigungu: null,
+    ageStart: 19,
+    ageEnd: 34,
+    jaBits: bits(on ?? []),
+    viewCount: 100,
+    deadlineDate: null,
+    deadlineKind: 'always',
+    ...rest,
+  };
+}
 
 const baseProfile: Profile = {
-  region: { sido: '서울특별시' },
-  age: 25,
-  education: '제한없음',
-  major: '제한없음',
-  marital: '제한없음',
-  employment: '제한없음',
-  specialization: ['제한없음'],
-  incomeManwon: undefined,
+  onboardingV: '5.0',
+  region: { sido: '서울', sigungu: null },
+  birthYear: new Date().getFullYear() - 25,
+  gender: 'undisclosed',
+  householdSize: 1,
+  incomeBracket: 'unknown',
+  statusFlags: ['none'],
+  householdFlags: ['none'],
+  pregnancyFlags: [],
+  business: null,
+  interests: [],
 };
 
-describe('M8: protected-class zero-leakage', () => {
-  test('with specialization=제한없음, no protected-class program appears', () => {
-    for (const p of typedPrograms) {
-      const r = matches(baseProfile, p);
-      if (r.matched) {
-        const req = p.특화분야_요건 ?? [];
-        const hasProtected = req.some((v) => (PROTECTED_SPECS as readonly string[]).includes(v));
-        expect(hasProtected, `Leak: ${p.사업명} appeared without opt-in`).toBe(false);
-      }
-    }
-  });
-
-  test('opt-in symmetry: women-only programs only visible when 여성 opted in', () => {
-    const withoutOptIn = typedPrograms.map((p) => matches(baseProfile, p)).filter((r) => r.matched);
-    const withOptIn = typedPrograms
-      .map((p) => matches({ ...baseProfile, specialization: ['여성'] }, p))
-      .filter((r) => r.matched);
-
-    for (const p of typedPrograms) {
-      if ((p.특화분야_요건 ?? []).includes('여성')) {
-        expect(
-          withoutOptIn.find((r) => r.matched && r.program.id === p.id),
-          `${p.사업명} leaked without 여성 opt-in`,
-        ).toBeUndefined();
-      }
-    }
-    expect(withOptIn.length).toBeGreaterThanOrEqual(withoutOptIn.length);
+describe('Age (rule a)', () => {
+  test('excludes below range', () => expect(matches({ ...baseProfile, birthYear: new Date().getFullYear() - 18 }, benefit()).matched).toBe(false));
+  test('excludes above range', () => expect(matches({ ...baseProfile, birthYear: new Date().getFullYear() - 35 }, benefit()).matched).toBe(false));
+  test('includes at bounds', () => {
+    expect(matches({ ...baseProfile, birthYear: new Date().getFullYear() - 19 }, benefit()).matched).toBe(true);
+    expect(matches({ ...baseProfile, birthYear: new Date().getFullYear() - 34 }, benefit()).matched).toBe(true);
   });
 });
 
-describe('Age boundaries (rule a)', () => {
-  const p: Program = { ...typedPrograms[0]!, id: 't-age', 나이_하한: 19, 나이_상한: 34 };
-  test('excludes below range', () => expect(matches({ ...baseProfile, age: 18 }, p).matched).toBe(false));
-  test('excludes above range', () => expect(matches({ ...baseProfile, age: 35 }, p).matched).toBe(false));
-  test('includes at lower bound', () => expect(matches({ ...baseProfile, age: 19 }, p).matched).toBe(true));
-  test('includes at upper bound', () => expect(matches({ ...baseProfile, age: 34 }, p).matched).toBe(true));
-});
-
-describe('Region matching (rule b)', () => {
-  test('전국 matches any 시/도', () => {
-    const p: Program = { ...typedPrograms[0]!, id: 't-region-1', 거주_지역: '전국' };
-    expect(matches({ ...baseProfile, region: { sido: '제주특별자치도' } }, p).matched).toBe(true);
+describe('Region (rule b)', () => {
+  test('national (regionSido=null) matches any sido', () => {
+    expect(matches(baseProfile, benefit({ regionSido: null })).matched).toBe(true);
   });
-  test('서울 matches 서울특별시', () => {
-    const p: Program = { ...typedPrograms[0]!, id: 't-region-2', 거주_지역: '서울' };
-    expect(matches({ ...baseProfile, region: { sido: '서울특별시' } }, p).matched).toBe(true);
+  test('sido match required when set', () => {
+    expect(matches(baseProfile, benefit({ regionSido: '서울' })).matched).toBe(true);
+    expect(matches(baseProfile, benefit({ regionSido: '부산' })).matched).toBe(false);
   });
-  test('부산 does not match 서울', () => {
-    const p: Program = { ...typedPrograms[0]!, id: 't-region-3', 거주_지역: '부산' };
-    expect(matches({ ...baseProfile, region: { sido: '서울특별시' } }, p).matched).toBe(false);
+  test('sigungu exact match required when benefit specifies one', () => {
+    expect(matches({ ...baseProfile, region: { sido: '서울', sigungu: '마포구' } }, benefit({ regionSido: '서울', regionSigungu: '마포구' })).matched).toBe(true);
+    expect(matches({ ...baseProfile, region: { sido: '서울', sigungu: '강남구' } }, benefit({ regionSido: '서울', regionSigungu: '마포구' })).matched).toBe(false);
+    expect(matches({ ...baseProfile, region: { sido: '서울', sigungu: null } }, benefit({ regionSido: '서울', regionSigungu: '마포구' })).matched).toBe(false);
   });
 });
 
-describe('Education hierarchy (rule c)', () => {
-  test('대학졸업 matches 고졸 이상 요건', () => {
-    const p: Program = { ...typedPrograms[0]!, id: 't-edu-1', 최종학력_요건: '고교졸업' };
-    expect(matches({ ...baseProfile, education: '대학졸업' }, p).matched).toBe(true);
+describe('Income (rule c)', () => {
+  test('unknown bracket skips the filter entirely', () => {
+    expect(matches({ ...baseProfile, incomeBracket: 'unknown' }, benefit({ on: ['JA0201'] })).matched).toBe(true);
   });
-  test('고교재학 does not match 대학졸업 요건', () => {
-    const p: Program = { ...typedPrograms[0]!, id: 't-edu-2', 최종학력_요건: '대학졸업' };
-    expect(matches({ ...baseProfile, education: '고교재학' }, p).matched).toBe(false);
+  test('benefit with zero income flags skips the filter (no data tagged)', () => {
+    expect(matches({ ...baseProfile, incomeBracket: '0-50' }, benefit({ on: [] })).matched).toBe(true);
+  });
+  test('bracket must be flagged Y when the benefit discriminates by income', () => {
+    expect(matches({ ...baseProfile, incomeBracket: '0-50' }, benefit({ on: ['JA0201'] })).matched).toBe(true);
+    expect(matches({ ...baseProfile, incomeBracket: '200+' }, benefit({ on: ['JA0201'] })).matched).toBe(false);
   });
 });
 
-describe('Income cap (rule h)', () => {
-  test('undefined income skips filter', () => {
-    const p: Program = { ...typedPrograms[0]!, id: 't-income-1', 개인_소득_상한: 300 };
-    expect(matches({ ...baseProfile, incomeManwon: undefined }, p).matched).toBe(true);
+describe('Status/household OR-groups (rules d/e) — zero-leakage + zero-flag passthrough', () => {
+  test('benefit with zero status flags is open to everyone (untagged data, not narrow)', () => {
+    expect(matches({ ...baseProfile, statusFlags: ['employee'] }, benefit({ on: [] })).matched).toBe(true);
   });
-  test('user income above cap excluded', () => {
-    const p: Program = { ...typedPrograms[0]!, id: 't-income-2', 개인_소득_상한: 300 };
-    expect(matches({ ...baseProfile, incomeManwon: 400 }, p).matched).toBe(false);
+  test('narrow status program requires the matching opt-in', () => {
+    const disabledOnly = benefit({ on: ['JA0328'] });
+    expect(matches({ ...baseProfile, statusFlags: ['none'] }, disabledOnly).matched).toBe(false);
+    expect(matches({ ...baseProfile, statusFlags: ['disabled'] }, disabledOnly).matched).toBe(true);
   });
-  test('user income at cap included', () => {
-    const p: Program = { ...typedPrograms[0]!, id: 't-income-3', 개인_소득_상한: 300 };
-    expect(matches({ ...baseProfile, incomeManwon: 300 }, p).matched).toBe(true);
+  test('narrow household program requires the matching opt-in', () => {
+    const singleOnly = benefit({ on: ['JA0404'] });
+    expect(matches({ ...baseProfile, householdFlags: ['none'] }, singleOnly).matched).toBe(false);
+    expect(matches({ ...baseProfile, householdFlags: ['single'] }, singleOnly).matched).toBe(true);
+  });
+});
+
+describe('Pregnancy (rule f) — default skipped', () => {
+  test('empty pregnancyFlags never excludes, even if benefit is narrow', () => {
+    expect(matches({ ...baseProfile, pregnancyFlags: [] }, benefit({ on: ['JA0302'] })).matched).toBe(true);
+  });
+  test('once user opts in, narrow benefit requires the matching flag', () => {
+    expect(matches({ ...baseProfile, pregnancyFlags: ['preparing'] }, benefit({ on: ['JA0302'] })).matched).toBe(false);
+    expect(matches({ ...baseProfile, pregnancyFlags: ['pregnant'] }, benefit({ on: ['JA0302'] })).matched).toBe(true);
   });
 });

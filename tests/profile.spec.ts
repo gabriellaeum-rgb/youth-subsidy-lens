@@ -1,16 +1,7 @@
 import { describe, test, expect, beforeEach, afterEach } from 'vitest';
-import {
-  saveProfileToSession,
-  loadProfileFromSession,
-  clearProfileFromSession,
-} from '../src/lib/profile';
+import { saveProfileToSession, loadProfileFromSession, clearProfileFromSession } from '../src/lib/profile';
 import type { Profile } from '../src/types';
 
-/**
- * F0-AC0.2: profile state lives only in sessionStorage, never in the URL. This test
- * environment is Node (no DOM) — stub a minimal in-memory sessionStorage on `window`
- * rather than pulling in jsdom for a single test file.
- */
 function createMemoryStorage(): Storage {
   const store = new Map<string, string>();
   return {
@@ -26,30 +17,31 @@ function createMemoryStorage(): Storage {
 }
 
 beforeEach(() => {
-  (globalThis as unknown as { window: unknown }).window = {
-    sessionStorage: createMemoryStorage(),
-  };
+  (globalThis as unknown as { window: unknown }).window = { sessionStorage: createMemoryStorage() };
 });
 
 afterEach(() => {
   delete (globalThis as unknown as { window?: unknown }).window;
 });
 
+const fullProfile: Profile = {
+  onboardingV: '5.0',
+  region: { sido: '서울', sigungu: '마포구' },
+  birthYear: 1998,
+  gender: 'female',
+  householdSize: 2,
+  incomeBracket: '76-100',
+  statusFlags: ['employee'],
+  householdFlags: ['single'],
+  pregnancyFlags: [],
+  business: null,
+  interests: ['housing'],
+};
+
 describe('saveProfileToSession / loadProfileFromSession round-trip', () => {
   test('full profile round-trips', () => {
-    const profile: Profile = {
-      region: { sido: '서울특별시', sigungu: '마포구' },
-      age: 28,
-      education: '대학졸업',
-      major: '상경계열',
-      marital: '미혼',
-      employment: '미취업자',
-      specialization: ['여성', '지역인재'],
-      incomeManwon: 250,
-    };
-    saveProfileToSession(profile);
-    const back = loadProfileFromSession();
-    expect(back).toEqual(profile);
+    saveProfileToSession(fullProfile);
+    expect(loadProfileFromSession()).toEqual(fullProfile);
   });
 
   test('no saved profile returns null', () => {
@@ -57,21 +49,12 @@ describe('saveProfileToSession / loadProfileFromSession round-trip', () => {
   });
 
   test('clearProfileFromSession removes the saved profile', () => {
-    saveProfileToSession({
-      region: { sido: '서울특별시' },
-      age: 25,
-      education: '제한없음',
-      major: '제한없음',
-      marital: '제한없음',
-      employment: '제한없음',
-      specialization: ['제한없음'],
-      incomeManwon: undefined,
-    });
+    saveProfileToSession(fullProfile);
     clearProfileFromSession();
     expect(loadProfileFromSession()).toBeNull();
   });
 
-  test('malformed stored value (missing sido/age) returns null', () => {
+  test('malformed stored value (missing sido/birthYear) returns null', () => {
     (globalThis as unknown as { window: { sessionStorage: Storage } }).window.sessionStorage.setItem(
       'yfl:profile',
       JSON.stringify({ foo: 'bar' }),

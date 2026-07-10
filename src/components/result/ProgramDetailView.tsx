@@ -1,140 +1,136 @@
 'use client';
 
 import * as React from 'react';
-import { useRouter } from 'next/navigation';
-import { X } from 'lucide-react';
+import Link from 'next/link';
+import { Header } from '@/components/layout/Header';
+import { Button } from '@/components/ui/Button';
+import { Skeleton } from '@/components/ui/Skeleton';
+import { DdayBadge } from './ListCard';
 import { ko } from '@/i18n/ko';
+import { useBenefits, useBenefitDetail } from '@/lib/useBenefits';
 import { loadProfileFromSession } from '@/lib/profile';
 import { matches } from '@/lib/matching';
-import { usePrograms } from '@/lib/usePrograms';
-import { Badge } from '@/components/ui/Badge';
-import { Button } from '@/components/ui/Button';
-import { MatchReason } from './MatchReason';
-import { ResultCardSkeleton } from '@/components/ui/Skeleton';
+import { getDeadlineInfo } from '@/lib/deadline';
 
-export function ProgramDetailView({ programId }: { programId: string }) {
-  const router = useRouter();
-  const programsState = usePrograms();
-  const [profile, setProfile] = React.useState<ReturnType<typeof loadProfileFromSession>>(null);
-  React.useEffect(() => {
-    setProfile(loadProfileFromSession());
-  }, []);
+export function ProgramDetailView({ serviceId }: { serviceId: string }) {
+  const benefitsState = useBenefits();
+  const detailState = useBenefitDetail(serviceId);
+  const profile = React.useMemo(() => loadProfileFromSession(), []);
 
-  React.useEffect(() => {
-    function onKeyDown(e: KeyboardEvent) {
-      if (e.key === 'Escape') router.back();
-    }
-    document.addEventListener('keydown', onKeyDown);
-    return () => document.removeEventListener('keydown', onKeyDown);
-  }, [router]);
+  const benefit = benefitsState.status === 'ready' ? benefitsState.benefits.find((b) => b.id === serviceId) : undefined;
 
-  if (programsState.status === 'loading') {
+  const reasons = React.useMemo(() => {
+    if (!benefit || !profile) return [];
+    const r = matches(profile, benefit);
+    return r.matched ? r.reasons : [];
+  }, [benefit, profile]);
+
+  if (benefitsState.status === 'loading' || detailState.status === 'loading') {
     return (
-      <div className="max-w-column mx-auto px-5 py-6">
-        <ResultCardSkeleton />
+      <div className="flex flex-col flex-1">
+        <Header backHref="/results" />
+        <div className="px-5 py-6 flex flex-col gap-4">
+          <Skeleton className="h-8 w-3/4" />
+          <Skeleton className="h-24 w-full" />
+          <Skeleton className="h-24 w-full" />
+        </div>
       </div>
     );
   }
 
-  const program =
-    programsState.status === 'ready' ? programsState.programs.find((p) => p.id === programId) : undefined;
-
-  if (programsState.status === 'error' || !program) {
+  if (!benefit || detailState.status === 'error' || !detailState.detail) {
     return (
-      <div className="max-w-column mx-auto px-5 py-9 text-center flex flex-col items-center gap-4">
-        <p className="text-body text-ink-900">{ko.results.detail.notFoundTitle}</p>
-        <button
-          type="button"
-          onClick={() => router.push('/results')}
-          className="text-primary font-medium hover:underline"
-        >
-          {ko.results.detail.notFoundLink}
-        </button>
+      <div className="flex flex-col flex-1">
+        <Header backHref="/results" />
+        <div className="flex-1 flex flex-col items-center justify-center gap-4 px-5 text-center">
+          <p className="text-body text-ink-700">{ko.detail.error}</p>
+          <Link href="/results" className="text-small text-primary">
+            {ko.detail.backToList}
+          </Link>
+        </div>
       </div>
     );
   }
 
-  const isClosed = program.모집상태 === '마감';
-  const result = profile ? matches(profile, program) : null;
-  const reasons = result?.matched ? result.reasons : [];
-  const checkTexts = [program.특이사항_텍스트, program.기타_요건_텍스트].filter(Boolean) as string[];
-  const titleId = 'detail-prog-name';
-  const reasonsId = 'detail-prog-reasons';
+  const detail = detailState.detail;
+  const info = getDeadlineInfo(benefit);
 
   return (
-    <div
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby={titleId}
-      aria-describedby={reasonsId}
-      className="flex flex-col min-h-screen md:min-h-0 md:max-w-[560px] md:mx-auto md:my-8 md:rounded-xl md:border md:border-ink-100 md:shadow-raised"
-    >
-      <div className="flex justify-end px-4 pt-3">
-        <button
-          type="button"
-          aria-label={ko.results.detail.close}
-          onClick={() => router.back()}
-          className="inline-flex items-center justify-center h-12 w-12 rounded-full hover:bg-bg-inset focus-visible:outline-none focus-visible:shadow-focus"
-        >
-          <X size={20} aria-hidden />
-        </button>
-      </div>
+    <div className="flex flex-col flex-1">
+      <Header backHref="/results" />
 
-      <div className="flex-1 overflow-y-auto px-5 pb-28 flex flex-col gap-4">
-        <div className="flex items-center gap-2 flex-wrap">
-          <Badge variant={isClosed ? 'muted' : 'success'}>{isClosed ? ko.results.badgeClosed : ko.results.badgeOpen}</Badge>
-          <Badge variant="info">{program.관할}</Badge>
-          {program.거주_지역 === '전국' && <Badge variant="info">전국</Badge>}
-        </div>
-
-        <h1 id={titleId} className="text-h1 font-bold text-ink-900">
-          {program.사업명}
-        </h1>
-
+      <div className="px-5 py-5 flex flex-col gap-6">
         <div>
-          <p className="font-mono text-display font-bold text-ink-900">{program.주요_지원내용}</p>
+          <h1 className="text-h1 font-bold text-ink-900">{benefit.name}</h1>
+          <p className="text-small text-ink-500 mt-1">{detail.agency}</p>
         </div>
 
         {reasons.length > 0 && (
-          <div id={reasonsId}>
-            <MatchReason reasons={reasons} programId={program.id} forceExpanded />
-          </div>
-        )}
-
-        {checkTexts.length > 0 && (
-          <div>
-            <h3 className="text-h3 font-semibold text-ink-900 mb-2">{ko.results.checkConditionsLabel}</h3>
-            <ul className="flex flex-col gap-1.5 text-body text-ink-700 list-disc pl-5">
-              {checkTexts.map((t, i) => (
-                <li key={i}>{t}</li>
+          <Section title={ko.detail.matchHeader}>
+            <div className="flex flex-col gap-2">
+              {reasons.map((r, i) => (
+                <p
+                  key={i}
+                  className="text-small text-primary rounded-md px-3 py-2"
+                  style={{ background: 'var(--color-primary-tint)' }}
+                >
+                  ✓ {r.userValue} — {r.requirement}
+                </p>
               ))}
-            </ul>
-          </div>
+            </div>
+          </Section>
         )}
 
-        <div className="text-small text-ink-500 flex flex-col gap-1">
-          <p>
-            {ko.results.deadlineLabel}: <span className="font-mono">{program.마감일 ?? ko.results.alwaysOpen}</span>
-          </p>
-          <p>
-            {ko.results.dataSourceLabel}: {program.관할}
-          </p>
-        </div>
+        <Section title={ko.detail.contentHeader}>
+          <p className="text-body text-ink-700 whitespace-pre-line">{detail.content || '-'}</p>
+        </Section>
+
+        <Section title={ko.detail.targetHeader}>
+          <p className="text-body text-ink-700 whitespace-pre-line">{detail.target || '-'}</p>
+          {detail.criteria && <p className="text-body text-ink-700 whitespace-pre-line mt-2">{detail.criteria}</p>}
+        </Section>
+
+        <Section
+          title={ko.detail.methodHeader}
+          right={<DdayBadge label={info.label} status={info.status} dday={info.dday} />}
+        >
+          <p className="text-body text-ink-700 whitespace-pre-line">{detail.method || '-'}</p>
+          <p className="text-small text-ink-500 whitespace-pre-line mt-2">{detail.deadlineDisplay}</p>
+        </Section>
+
+        <Section title={ko.detail.contactHeader}>
+          <p className="text-body text-ink-700">{detail.receivingOrg || '-'}</p>
+          {detail.phone && (
+            <a href={`tel:${detail.phone}`} className="text-body text-primary block mt-1">
+              {detail.phone}
+            </a>
+          )}
+        </Section>
       </div>
 
+      <div className="flex-1" />
       <div
-        className="sticky bottom-0 bg-bg px-5 pt-4 border-t border-ink-100"
-        style={{ paddingBottom: 'max(16px, env(safe-area-inset-bottom))' }}
+        className="sticky bottom-0 px-5 py-3 bg-white"
+        style={{ boxShadow: 'var(--shadow-sticky-cta)', paddingBottom: 'calc(12px + env(safe-area-inset-bottom))' }}
       >
-        <Button
-          variant={isClosed ? 'secondary' : 'primary'}
-          size="lg"
-          fullWidth
-          onClick={() => window.open(program.공식_정보_링크, '_blank', 'noopener,noreferrer')}
-        >
-          {isClosed ? ko.results.ctaClosed : ko.results.ctaApply}
-        </Button>
+        <a href={detail.url} target="_blank" rel="noopener noreferrer" className="block">
+          <Button size="lg" fullWidth>
+            {ko.detail.ctaApply}
+          </Button>
+        </a>
       </div>
+    </div>
+  );
+}
+
+function Section({ title, right, children }: { title: string; right?: React.ReactNode; children: React.ReactNode }) {
+  return (
+    <div className="border-t border-[color:var(--color-border)] pt-5">
+      <div className="flex items-center justify-between mb-2">
+        <h2 className="text-h2 font-bold text-ink-900">{title}</h2>
+        {right}
+      </div>
+      {children}
     </div>
   );
 }

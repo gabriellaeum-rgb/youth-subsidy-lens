@@ -1,87 +1,82 @@
-export type Education =
-  | '제한없음' | '고졸미만' | '고교재학' | '고졸예정' | '고교졸업'
-  | '대학재학' | '대졸예정' | '대학졸업' | '석박사' | '기타';
+// PRD v5 §F5 data shapes (public/data/benefits_list.json + public/data/detail/[id].json)
+// and §F2 profile shape (sessionStorage). See scripts/build-dataset.mjs for the ETL
+// that produces the JSON this file's types describe.
 
-export const EDUCATION_OPTIONS: readonly Education[] = [
-  '제한없음', '고졸미만', '고교재학', '고졸예정', '고교졸업',
-  '대학재학', '대졸예정', '대학졸업', '석박사', '기타',
+export type CategoryTag = '현금성 지원' | '이용권·바우처·현물' | '서비스 지원' | '시설 이용';
+
+export const CATEGORY_OPTIONS: readonly { tag: CategoryTag; emoji: string; label: string }[] = [
+  { tag: '현금성 지원', emoji: '💰', label: '현금성 지원' },
+  { tag: '이용권·바우처·현물', emoji: '🎟️', label: '이용권·바우처·현물' },
+  { tag: '서비스 지원', emoji: '🤝', label: '서비스 지원' },
+  { tag: '시설 이용', emoji: '🏢', label: '시설 이용' },
 ] as const;
 
-export type Major =
-  | '제한없음' | '인문계열' | '사회계열' | '상경계열' | '이학계열'
-  | '공학계열' | '예체능계열' | '농산업계열' | '기타';
+export type DeadlineKind = 'dated' | 'always' | 'unknown';
 
-export const MAJOR_OPTIONS: readonly Major[] = [
-  '제한없음', '인문계열', '사회계열', '상경계열', '이학계열',
-  '공학계열', '예체능계열', '농산업계열', '기타',
-] as const;
+/** One row of public/data/benefits_list.json — list/matching fields only. */
+export type Benefit = {
+  id: string;
+  name: string;
+  agency: string;
+  agencyType: string;
+  categoryTags: CategoryTag[];
+  serviceField: string | null;
+  regionSido: string | null;
+  regionSigungu: string | null;
+  ageStart: number;
+  ageEnd: number;
+  /** Bitstring over _meta.json's `jaCols` order — '1' = flag Y. */
+  jaBits: string;
+  viewCount: number;
+  deadlineDate: string | null; // ISO yyyy-mm-dd, only when deadlineKind === 'dated'
+  deadlineKind: DeadlineKind;
+};
 
-export type Marital = '제한없음' | '기혼' | '미혼';
+/** One file at public/data/detail/[id].json — free-text detail fields, lazy loaded. */
+export type BenefitDetail = {
+  id: string;
+  name: string;
+  agency: string;
+  purposeSummary: string;
+  target: string;
+  criteria: string;
+  content: string;
+  method: string;
+  deadlineDisplay: string;
+  receivingOrg: string;
+  phone: string;
+  url: string;
+};
 
-export const MARITAL_OPTIONS: readonly Marital[] = ['제한없음', '기혼', '미혼'] as const;
+export type DatasetMeta = {
+  generatedAt: string;
+  count: number;
+  jaCols: string[];
+  deadlineParsing: { dated: number; always: number; unknown: number; datedRate: number };
+};
 
-export type Employment =
-  | '제한없음' | '재직자' | '자영업자' | '미취업자' | '프리랜서'
-  | '일용근로자' | '예비창업자' | '단기근로자' | '영농종사자' | '기타';
+// ---- Profile (onboarding v5.0, 9 questions) ----
 
-export const EMPLOYMENT_OPTIONS: readonly Employment[] = [
-  '제한없음', '재직자', '자영업자', '미취업자', '프리랜서',
-  '일용근로자', '예비창업자', '단기근로자', '영농종사자', '기타',
-] as const;
-
-export type Specialization =
-  | '제한없음' | '중소기업' | '여성' | '기초생활수급자' | '한부모가정'
-  | '장애인' | '농업인' | '군인' | '지역인재' | '기타';
-
-export const SPECIALIZATION_OPTIONS: readonly Specialization[] = [
-  '제한없음', '중소기업', '여성', '기초생활수급자', '한부모가정',
-  '장애인', '농업인', '군인', '지역인재', '기타',
-] as const;
-
-/** Protected-class specializations — enforced M8 zero-leakage. */
-export const PROTECTED_SPECS: readonly Specialization[] = [
-  '여성', '장애인', '한부모가정', '기초생활수급자', '군인',
-] as const;
+export type Gender = 'male' | 'female' | 'undisclosed';
+export type IncomeBracket = '0-50' | '51-75' | '76-100' | '101-200' | '200+' | 'unknown';
+export type BusinessStatus = 'preparing' | 'operating' | 'closing';
+export type BusinessIndustry = 'food' | 'manufacturing' | 'agriculture' | 'it' | 'other';
 
 export type Profile = {
-  region: {
-    sido: string;
-    sigungu?: string;
-  };
-  age: number;
-  education: Education;
-  major: Major;
-  marital: Marital;
-  employment: Employment;
-  specialization: Specialization[];
-  incomeManwon?: number;
+  onboardingV: '5.0';
+  region: { sido: string; sigungu: string | null };
+  birthYear: number;
+  gender: Gender;
+  householdSize: number; // 1-7 (7 = "7명 이상")
+  incomeBracket: IncomeBracket;
+  statusFlags: string[]; // option keys, see src/lib/onboardingOptions.ts
+  householdFlags: string[];
+  pregnancyFlags: string[];
+  business: { status: BusinessStatus; industry: BusinessIndustry } | null;
+  interests: string[]; // 0-3 of INTEREST_OPTIONS keys
 };
 
-export type Program = {
-  id: string;
-  사업명: string;
-  관할: string;
-  분류: string;
-  주요_지원내용: string;
-  나이_하한: number;
-  나이_상한: number;
-  거주_지역: string;
-  최종학력_요건: Education;
-  전공_요건: Major;
-  혼인_요건: Marital;
-  취업상태_요건: Employment | Employment[];
-  특화분야_요건: Specialization[];
-  개인_소득_상한?: number | null;
-  모집상태: '모집중' | '마감';
-  마감일?: string | null;
-  공식_정보_링크: string;
-  특이사항_텍스트?: string | null;
-  기타_요건_텍스트?: string | null;
-  비고_텍스트?: string | null;
-};
-
-export type ReasonAttribute =
-  | '연령' | '관심지역' | '최종학력' | '전공' | '혼인상태' | '취업상태' | '특화분야' | '소득';
+export type ReasonAttribute = '연령' | '관심지역' | '소득' | '신분' | '가구' | '관심분야';
 
 export type Reason = {
   attribute: ReasonAttribute;
@@ -90,5 +85,5 @@ export type Reason = {
 };
 
 export type MatchResult =
-  | { matched: true; reasons: Reason[]; program: Program }
+  | { matched: true; reasons: Reason[]; benefit: Benefit }
   | { matched: false; reasons: [] };

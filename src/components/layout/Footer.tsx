@@ -3,16 +3,14 @@ import { ko } from '@/i18n/ko';
 
 export function Footer() {
   return (
-    <footer className="border-t border-ink-100 mt-8">
-      <nav
-        aria-label="footer"
-        className="max-w-content mx-auto px-5 md:px-6 py-6 flex flex-wrap gap-4 text-small text-ink-500"
-      >
+    <footer className="mt-4" style={{ paddingBottom: 'calc(20px + env(safe-area-inset-bottom))' }}>
+      <p className="text-xs text-ink-500 px-5 mb-3">{ko.landing.disclaimer}</p>
+      <nav aria-label="footer" className="px-5 flex flex-wrap gap-4 text-xs text-ink-500">
         <Link href="/about" className="hover:text-ink-700 hover:underline">
-          {ko.footer.method}
+          {ko.footer.methodology}
         </Link>
         <Link href="/about#data" className="hover:text-ink-700 hover:underline">
-          {ko.footer.data}
+          {ko.footer.dataSource}
         </Link>
         <Link href="/about#feedback" className="hover:text-ink-700 hover:underline">
           {ko.footer.feedback}

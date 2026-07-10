@@ -1,56 +1,16 @@
-import type { Profile, Program } from '@/types';
+import type { Benefit, Profile } from '@/types';
 import { matches } from './matching';
 
-type RestrictiveField = { name: string; value: string };
+/** PRD v5 §F3-AC3.7: on zero matches, offer to drop the income filter first (it's the
+ * single most likely over-restrictive answer — "잘 모르겠어요" always widens results). */
+export function countWithoutIncomeFilter(profile: Profile, all: Benefit[]): number {
+  const relaxed: Profile = { ...profile, incomeBracket: 'unknown' };
+  return all.filter((b) => matches(relaxed, b).matched).length;
+}
 
-/**
- * For each optional field set to a restrictive (non-제한없음) value, measure how many
- * additional programs would match if that field were relaxed to its default. Returns the
- * single field whose relaxation would surface the most programs, or null if none would help.
- * Region and age are required fields and are never counted here.
- */
-export function findMostRestrictiveField(profile: Profile, allPrograms: Program[]): RestrictiveField | null {
-  const baselineCount = allPrograms.filter((p) => matches(profile, p).matched).length;
-
-  const candidates: Array<{ name: string; value: string; relaxed: Profile }> = [];
-
-  if (profile.education !== '제한없음') {
-    candidates.push({ name: '최종학력', value: profile.education, relaxed: { ...profile, education: '제한없음' } });
-  }
-  if (profile.major !== '제한없음') {
-    candidates.push({ name: '전공', value: profile.major, relaxed: { ...profile, major: '제한없음' } });
-  }
-  if (profile.marital !== '제한없음') {
-    candidates.push({ name: '혼인상태', value: profile.marital, relaxed: { ...profile, marital: '제한없음' } });
-  }
-  if (profile.employment !== '제한없음') {
-    candidates.push({ name: '취업상태', value: profile.employment, relaxed: { ...profile, employment: '제한없음' } });
-  }
-  const specRestrictive = !(profile.specialization.length === 1 && profile.specialization[0] === '제한없음');
-  if (specRestrictive) {
-    candidates.push({
-      name: '특화분야',
-      value: profile.specialization.join(', '),
-      relaxed: { ...profile, specialization: ['제한없음'] },
-    });
-  }
-  if (profile.incomeManwon !== undefined) {
-    candidates.push({
-      name: '소득',
-      value: `월 ${profile.incomeManwon}만원`,
-      relaxed: { ...profile, incomeManwon: undefined },
-    });
-  }
-
-  let best: RestrictiveField | null = null;
-  let bestGain = 0;
-  for (const c of candidates) {
-    const relaxedCount = allPrograms.filter((p) => matches(c.relaxed, p).matched).length;
-    const gain = relaxedCount - baselineCount;
-    if (gain > bestGain) {
-      bestGain = gain;
-      best = { name: c.name, value: c.value };
-    }
-  }
-  return best;
+/** True if the user's age is outside every benefit's range in the dataset — a distinct,
+ * more final empty state than "just relax a filter" (nothing to relax). */
+export function isAgeOutOfRange(profile: Profile, all: Benefit[]): boolean {
+  const age = new Date().getFullYear() - profile.birthYear;
+  return !all.some((b) => b.ageStart <= age && age <= b.ageEnd);
 }

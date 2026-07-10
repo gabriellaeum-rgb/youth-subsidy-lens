@@ -1,8 +1,8 @@
-export function ProgressBar({ step, total = 8 }: { step: number; total?: number }) {
+export function ProgressBar({ step, total = 9 }: { step: number; total?: number }) {
   return (
     <div className="flex flex-col gap-1">
       <div className="flex justify-end">
-        <span className="text-small text-ink-500 font-mono">{`${step} / ${total}`}</span>
+        <span className="text-caption text-ink-500 font-mono">{`${step}/${total}`}</span>
       </div>
       <div
         role="progressbar"
