@@ -3,6 +3,7 @@ import { matches, setJaCols, currentAge } from '../src/lib/matching';
 import type { Benefit, Profile } from '../src/types';
 
 const JA_COLS = [
+  'JA0101', 'JA0102',
   'JA0201', 'JA0202', 'JA0203', 'JA0204', 'JA0205',
   'JA0313', 'JA0314', 'JA0315', 'JA0316', 'JA0320', 'JA0322', 'JA0326', 'JA0327', 'JA0328', 'JA0329', 'JA0330',
   'JA0401', 'JA0402', 'JA0403', 'JA0404', 'JA0410', 'JA0411', 'JA0412', 'JA0413', 'JA0414',
@@ -78,6 +79,35 @@ describe('Age (rule a)', () => {
   test('includes at bounds', () => {
     expect(matches({ ...baseProfile, birthDate: birthDateForAge(19) }, benefit()).matched).toBe(true);
     expect(matches({ ...baseProfile, birthDate: birthDateForAge(34) }, benefit()).matched).toBe(true);
+  });
+});
+
+describe('Gender (rule a2) — JA0101=남성/JA0102=여성 exclusivity, 2026-07-10', () => {
+  test('unisex benefit (both Y) matches everyone', () => {
+    const unisex = benefit({ on: ['JA0101', 'JA0102'] });
+    expect(matches({ ...baseProfile, gender: 'male' }, unisex).matched).toBe(true);
+    expect(matches({ ...baseProfile, gender: 'female' }, unisex).matched).toBe(true);
+  });
+  test('female-only (JA0101 blank, JA0102=Y) excluded for male, included for female', () => {
+    const femaleOnly = benefit({ on: ['JA0102'] });
+    expect(matches({ ...baseProfile, gender: 'male' }, femaleOnly).matched).toBe(false);
+    expect(matches({ ...baseProfile, gender: 'female' }, femaleOnly).matched).toBe(true);
+  });
+  test('male-only (JA0101=Y, JA0102 blank) excluded for female, included for male', () => {
+    const maleOnly = benefit({ on: ['JA0101'] });
+    expect(matches({ ...baseProfile, gender: 'female' }, maleOnly).matched).toBe(false);
+    expect(matches({ ...baseProfile, gender: 'male' }, maleOnly).matched).toBe(true);
+  });
+  test('neither flag set (both blank) matches everyone', () => {
+    const untagged = benefit({ on: [] });
+    expect(matches({ ...baseProfile, gender: 'male' }, untagged).matched).toBe(true);
+    expect(matches({ ...baseProfile, gender: 'female' }, untagged).matched).toBe(true);
+  });
+  test('"응답하지 않음" ignores gender entirely, even for exclusive benefits', () => {
+    const femaleOnly = benefit({ on: ['JA0102'] });
+    const maleOnly = benefit({ on: ['JA0101'] });
+    expect(matches({ ...baseProfile, gender: 'undisclosed' }, femaleOnly).matched).toBe(true);
+    expect(matches({ ...baseProfile, gender: 'undisclosed' }, maleOnly).matched).toBe(true);
   });
 });
 

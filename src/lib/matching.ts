@@ -100,6 +100,13 @@ export function matches(profile: Profile, benefit: Benefit): MatchResult {
   if (!(benefit.ageStart <= age && age <= benefit.ageEnd)) return NO_MATCH;
   reasons.push({ attribute: '연령', userValue: `만 ${age}세`, requirement: `${benefit.ageStart}~${benefit.ageEnd}세` });
 
+  // (a2) 성별 — mandatory when answered (2026-07-10 requirement). JA0101=남성,
+  // JA0102=여성; the dataset only ever has "Y" or blank (no explicit "N"), so a
+  // blank flag reads as hasFlag()===false. A program tagged Y for one gender and
+  // blank for the other is gender-exclusive; "응답하지 않음" ignores this entirely.
+  if (profile.gender === 'male' && !hasFlag(benefit, 'JA0101') && hasFlag(benefit, 'JA0102')) return NO_MATCH;
+  if (profile.gender === 'female' && hasFlag(benefit, 'JA0101') && !hasFlag(benefit, 'JA0102')) return NO_MATCH;
+
   // (b) 지역 — mandatory (AC5.4): null sido = 전국(national); a benefit administered by
   // a specific local agency only matches users in that exact sido (+ sigungu if the
   // agency is sigungu-level) — see scripts/build-dataset.mjs `parseRegion()` for how
